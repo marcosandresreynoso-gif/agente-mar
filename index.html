@@ -104,14 +104,12 @@
   </div>
   <div id="modo-badge"><div class="dot"></div><span id="modo-texto">Listo</span></div>
 </header>
-
 <div id="modulos-legend">
   <div class="legend-item"><div class="legend-dot" style="background:var(--comercial)"></div>Comercial</div>
   <div class="legend-item"><div class="legend-dot" style="background:var(--contable)"></div>Contable</div>
   <div class="legend-item"><div class="legend-dot" style="background:var(--finanzas)"></div>Finanzas</div>
   <div class="legend-item"><div class="legend-dot" style="background:var(--legal)"></div>Legal</div>
 </div>
-
 <div id="nav-modulos">
   <button class="nav-btn activo-todos" id="btn-todos" onclick="filtrar('todos')">⬡ Todos</button>
   <button class="nav-btn" id="btn-comercial" onclick="filtrar('comercial')">◈ Comercial</button>
@@ -119,9 +117,7 @@
   <button class="nav-btn" id="btn-finanzas"  onclick="filtrar('finanzas')">◆ Finanzas</button>
   <button class="nav-btn" id="btn-legal"     onclick="filtrar('legal')">◎ Legal</button>
 </div>
-
 <div id="chat"></div>
-
 <div id="chips-wrap">
   <div class="chips-label">Consultas frecuentes</div>
   <div class="chips-row">
@@ -141,7 +137,6 @@
     <div class="chip c-legal" onclick="enviarChip(this)">¿Cómo protejo mi trabajo intelectual?</div>
   </div>
 </div>
-
 <div id="input-area">
   <textarea id="user-input" placeholder="Consultá sobre tu negocio, finanzas, legal, AFIP..." rows="1"></textarea>
   <button id="send-btn" onclick="enviar()">
@@ -149,7 +144,6 @@
   </button>
 </div>
 <div class="footer">M-AR & Asociados · Agente Integral · 4 Módulos</div>
-
 <script>
 const SYSTEM_PROMPT = `Sos el Agente Integral de Organización M-AR & Asociados, empresa argentina con sede en General Villegas, Buenos Aires.
 
@@ -195,7 +189,7 @@ let historial=[], cargando=false, modoActual='neutral';
 const MODULOS={'COMERCIAL':'comercial','CONTABLE':'contable','FINANZAS':'finanzas','LEGAL':'legal'};
 const ETIQUETAS={comercial:'◈ Comercial',contable:'◉ Contable',finanzas:'◆ Finanzas',legal:'◎ Legal'};
 
-function detectarModo(t){for(const[k,v]of Object.entries(MODULOS)){if(t.includes(`[MÓDULO: ${k}]`))return v;}return modoActual;}
+function detectarModo(t){for(const[k,v]of Object.entries(MODULOS)){if(t.includes('[MÓDULO: '+k+']'))return v;}return modoActual;}
 function limpiarEtiqueta(t){return t.replace(/\[MÓDULO: COMERCIAL\]/g,'').replace(/\[MÓDULO: CONTABLE\]/g,'').replace(/\[MÓDULO: FINANZAS\]/g,'').replace(/\[MÓDULO: LEGAL\]/g,'').trim();}
 
 function actualizarBadge(modo){
@@ -208,12 +202,12 @@ function actualizarBadge(modo){
 function agregarMensaje(rol,texto,modo){
   const chat=document.getElementById('chat');
   const div=document.createElement('div');
-  div.className=`msg ${rol}`;
-  if(rol==='agente'&&modo){div.classList.add(`m-${modo}`);div.dataset.modo=modo;}
+  div.className='msg '+rol;
+  if(rol==='agente'&&modo){div.classList.add('m-'+modo);div.dataset.modo=modo;}
   const av=document.createElement('div');av.className='avatar';av.textContent=rol==='agente'?'M-AR':'VOS';
   const bur=document.createElement('div');bur.className='burbuja';
   if(rol==='agente'&&modo&&modo!=='neutral'){
-    const tag=document.createElement('div');tag.className=`modulo-tag tag-${modo}`;tag.textContent=ETIQUETAS[modo]||modo;
+    const tag=document.createElement('div');tag.className='modulo-tag tag-'+modo;tag.textContent=ETIQUETAS[modo]||modo;
     bur.appendChild(tag);const sp=document.createElement('div');sp.style.height='3px';bur.appendChild(sp);
   }
   bur.appendChild(document.createTextNode(texto));
@@ -222,12 +216,12 @@ function agregarMensaje(rol,texto,modo){
 
 function mostrarTyping(){
   const chat=document.getElementById('chat');
-  const div=document.createElement('div');div.className=`msg agente m-${modoActual}`;div.id='typing';
+  const div=document.createElement('div');div.className='msg agente m-'+modoActual;div.id='typing';
   const av=document.createElement('div');av.className='avatar';av.textContent='M-AR';
   const bur=document.createElement('div');bur.className='burbuja';
   const cols={comercial:'var(--comercial)',contable:'var(--contable)',finanzas:'var(--finanzas)',legal:'var(--legal)'};
   const c=cols[modoActual]||'#555';
-  bur.innerHTML=`<div class="typing-indicator"><span style="background:${c}"></span><span style="background:${c}"></span><span style="background:${c}"></span></div>`;
+  bur.innerHTML='<div class="typing-indicator"><span style="background:'+c+'"></span><span style="background:'+c+'"></span><span style="background:'+c+'"></span></div>';
   div.appendChild(av);div.appendChild(bur);chat.appendChild(div);chat.scrollTop=chat.scrollHeight;
 }
 
@@ -235,7 +229,7 @@ function quitarTyping(){const el=document.getElementById('typing');if(el)el.remo
 
 function filtrar(modulo){
   document.querySelectorAll('.nav-btn').forEach(b=>b.className='nav-btn');
-  document.getElementById(`btn-${modulo}`).classList.add(`activo-${modulo}`);
+  document.getElementById('btn-'+modulo).classList.add('activo-'+modulo);
   document.querySelectorAll('.msg.agente').forEach(msg=>{
     msg.style.display=(modulo==='todos'||msg.dataset.modo===modulo||!msg.dataset.modo)?'':'none';
   });
@@ -245,19 +239,19 @@ async function llamarAPI(msg){
   historial.push({role:'user',content:msg});
   mostrarTyping();cargando=true;document.getElementById('send-btn').disabled=true;
   try{
-    const res=await fetch('/.netlify/functions/chat',{
+    const res=await fetch('/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({system:SYSTEM_PROMPT,messages:historial})
     });
     const data=await res.json();
-    const raw=data.text||'No pude procesar eso. ¿Podés repetirlo?';
+    const raw=data.text||'No pude procesar eso. Intentá de nuevo.';
     const modo=detectarModo(raw);const limpio=limpiarEtiqueta(raw);
     modoActual=modo;actualizarBadge(modo);quitarTyping();
     historial.push({role:'assistant',content:raw});agregarMensaje('agente',limpio,modo);
   }catch(e){
     quitarTyping();
-    agregarMensaje('agente','Error de conexión. Verificá la configuración del servidor.','neutral');
+    agregarMensaje('agente','Error de conexión. Intentá de nuevo.','neutral');
   }
   cargando=false;document.getElementById('send-btn').disabled=false;
 }
