@@ -4,19 +4,21 @@ const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 
+const MIME = {
+  '.html': 'text/html',
+  '.js':   'application/javascript',
+  '.css':  'text/css',
+  '.json': 'application/json',
+};
+
 const server = http.createServer(async (req, res) => {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // API endpoint
+  // API chat
   if (req.method === 'POST' && req.url === '/chat') {
     let body = '';
     req.on('data', chunk => body += chunk);
@@ -24,23 +26,16 @@ const server = http.createServer(async (req, res) => {
       try {
         const { system, messages } = JSON.parse(body);
         const groqMessages = [{ role: 'system', content: system }, ...messages];
-
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
           },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            max_tokens: 1000,
-            messages: groqMessages
-          })
+          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: 1000, messages: groqMessages })
         });
-
         const data = await response.json();
         const text = data.choices?.[0]?.message?.content || 'No pude procesar eso.';
-
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ text }));
       } catch (e) {
@@ -51,24 +46,36 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Servir index.html
-  if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
+  // Servir archivos estáticos
+  if (req.method === 'GET') {
+    let filePath;
+    if (req.url === '/' || req.url === '/index.html') {
+      filePath = path.join(__dirname, 'index.html');
+    } else {
+      // Buscar el archivo con cualquier nombre
+      let urlPath = req.url.split('?')[0];
+      filePath = path.join(__dirname, urlPath);
+      // Si no tiene extensión, probar con .html
+      if (!path.extname(filePath)) {
+        filePath = filePath + '.html';
+      }
+    }
+
+    fs.readFile(filePath, (err, data) => {
       if (err) {
-        res.writeHead(404);
-        res.end('Not found');
+        // Intentar con el nombre sin tilde/caracteres especiales
+        res.writeHead(404, { 'Content-Type': 'text/html' });
+        res.end('<h1>404 - Página no encontrada</h1>');
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      const ext = path.extname(filePath);
+      res.writeHead(200, { 'Content-Type': MIME[ext] || 'text/plain' });
       res.end(data);
     });
     return;
   }
 
-  res.writeHead(404);
-  res.end('Not found');
+  res.writeHead(404); res.end('Not found');
 });
 
-server.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
