@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agente Integral — M-AR & Asociados</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap');
+  :root {
+    --negro:#0D0D0D; --blanco:#F7F5F0;
+    --comercial:#C8A96E; --contable:#4A9E7F; --finanzas:#6E8FC8; --legal:#C86E6E;
+    --comercial-s:#C8A96E15; --contable-s:#4A9E7F15; --finanzas-s:#6E8FC815; --legal-s:#C86E6E15;
+    --gris-oscuro:#1A1A1A; --borde:#1E1E1E; --texto-sec:#666;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--negro);color:var(--blanco);font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+
+  /* MODAL LÍMITE */
+  #modal-limite{position:fixed;inset:0;background:#000000ee;display:none;align-items:center;justify-content:center;z-index:200;padding:20px;}
+  .limite-box{background:#111;border:1px solid var(--comercial);padding:32px 24px;max-width:360px;width:100%;text-align:center;}
+  .limite-icono{font-size:38px;margin-bottom:14px;}
+  .limite-box h2{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;margin-bottom:10px;color:var(--blanco);}
+  .limite-box p{font-size:13px;color:var(--texto-sec);line-height:1.7;margin-bottom:22px;}
+  .limite-box p span{color:var(--comercial);font-weight:600;}
+  .wa-btn{display:block;padding:13px;background:#25D366;border:none;color:#fff;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;border-radius:4px;text-decoration:none;margin-bottom:8px;}
+  .email-btn{display:block;padding:10px;background:transparent;border:1px solid #2A2A2A;color:var(--texto-sec);font-family:'Syne',sans-serif;font-size:11px;cursor:pointer;border-radius:4px;text-decoration:none;}
+
+  header{padding:16px 18px 13px;border-bottom:1px solid var(--borde);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--negro);z-index:10;}
+  .logo{width:38px;height:38px;flex-shrink:0;position:relative;}
+  .logo-ring{position:absolute;}
+  .logo-ring:nth-child(1){inset:0;border:1.5px solid var(--comercial);}
+  .logo-ring:nth-child(2){inset:5px;border:1px solid var(--contable);transform:rotate(45deg);}
+  .logo-ring:nth-child(3){inset:10px;border:1px solid var(--finanzas);transform:rotate(22deg);}
+  .logo-ring:nth-child(4){inset:14px;border:1px solid var(--legal);transform:rotate(67deg);}
+  .logo span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:9px;color:var(--blanco);z-index:1;}
+  .header-info{flex:1;}
+  .header-info h1{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;}
+  .header-info p{font-size:10px;color:var(--texto-sec);margin-top:1px;}
+  #modo-badge{font-size:10px;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:3px 9px;border:1px solid #252525;color:var(--texto-sec);transition:all .35s;display:flex;align-items:center;gap:5px;}
+  #modo-badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:puls 2s infinite;}
+  @keyframes puls{0%,100%{opacity:1;}50%{opacity:.2;}}
+  #modo-badge.comercial{color:var(--comercial);border-color:var(--comercial);background:var(--comercial-s);}
+  #modo-badge.contable{color:var(--contable);border-color:var(--contable);background:var(--contable-s);}
+  #modo-badge.finanzas{color:var(--finanzas);border-color:var(--finanzas);background:var(--finanzas-s);}
+  #modo-badge.legal{color:var(--legal);border-color:var(--legal);background:var(--legal-s);}
+
+  /* BARRA CONTADOR */
+  #contador-bar{display:flex;align-items:center;justify-content:space-between;padding:7px 18px;border-bottom:1px solid var(--borde);}
+  .contador-label{font-size:10px;color:var(--texto-sec);font-family:'Syne',sans-serif;letter-spacing:.5px;}
+  .contador-label span{color:var(--comercial);font-weight:700;}
+  .puntos{display:flex;gap:4px;}
+  .punto{width:9px;height:9px;border-radius:50%;background:#1E1E1E;border:1px solid #2A2A2A;transition:all .3s;}
+  .punto.activo{background:var(--comercial);border-color:var(--comercial);}
+
+  #modulos-legend{display:flex;gap:12px;border-bottom:1px solid var(--borde);padding:7px 15px;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--texto-sec);font-family:'Syne',sans-serif;}
+  .legend-dot{width:6px;height:6px;border-radius:50%;}
+  #nav-modulos{display:flex;border-bottom:1px solid var(--borde);overflow-x:auto;scrollbar-width:none;}
+  #nav-modulos::-webkit-scrollbar{display:none;}
+  .nav-btn{flex:1;min-width:70px;padding:9px 6px;background:none;border:none;border-bottom:2px solid transparent;color:var(--texto-sec);font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;transition:all .2s;white-space:nowrap;}
+  .nav-btn:hover{color:var(--blanco);}
+  .nav-btn.activo-todos{color:var(--blanco);border-bottom-color:var(--blanco);}
+  .nav-btn.activo-comercial{color:var(--comercial);border-bottom-color:var(--comercial);}
+  .nav-btn.activo-contable{color:var(--contable);border-bottom-color:var(--contable);}
+  .nav-btn.activo-finanzas{color:var(--finanzas);border-bottom-color:var(--finanzas);}
+  .nav-btn.activo-legal{color:var(--legal);border-bottom-color:var(--legal);}
+  #chat{flex:1;overflow-y:auto;padding:18px 15px;display:flex;flex-direction:column;gap:13px;scroll-behavior:smooth;}
+  #chat::-webkit-scrollbar{width:3px;}
+  #chat::-webkit-scrollbar-thumb{background:#1E1E1E;}
+  .msg{display:flex;gap:9px;max-width:91%;animation:fadeUp .28s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .msg.agente{align-self:flex-start;}
+  .msg.usuario{align-self:flex-end;flex-direction:row-reverse;}
+  .avatar{width:26px;height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:8px;font-weight:800;margin-top:3px;}
+  .msg.agente .avatar{border:1px solid #2A2A2A;color:var(--texto-sec);}
+  .msg.usuario .avatar{background:#141414;border:1px solid #252525;color:var(--texto-sec);}
+  .msg.agente.m-comercial .avatar{border-color:var(--comercial);color:var(--comercial);background:var(--comercial-s);}
+  .msg.agente.m-contable .avatar{border-color:var(--contable);color:var(--contable);background:var(--contable-s);}
+  .msg.agente.m-finanzas .avatar{border-color:var(--finanzas);color:var(--finanzas);background:var(--finanzas-s);}
+  .msg.agente.m-legal .avatar{border-color:var(--legal);color:var(--legal);background:var(--legal-s);}
+  .burbuja{padding:11px 14px;line-height:1.65;font-size:13.5px;}
+  .msg.agente .burbuja{background:var(--gris-oscuro);border:1px solid #202020;border-radius:0 11px 11px 11px;color:#DDD9D0;}
+  .msg.usuario .burbuja{background:#141414;border:1px solid #252525;border-radius:11px 0 11px 11px;color:var(--blanco);}
+  .modulo-tag{display:inline-block;font-size:9px;font-family:'Syne',sans-serif;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;margin-bottom:8px;border-radius:2px;}
+  .tag-comercial{background:var(--comercial-s);color:var(--comercial);border:1px solid var(--comercial);}
+  .tag-contable{background:var(--contable-s);color:var(--contable);border:1px solid var(--contable);}
+  .tag-finanzas{background:var(--finanzas-s);color:var(--finanzas);border:1px solid var(--finanzas);}
+  .tag-legal{background:var(--legal-s);color:var(--legal);border:1px solid var(--legal);}
+  .typing-indicator{display:flex;gap:5px;align-items:center;padding:11px 14px;}
+  .typing-indicator span{width:5px;height:5px;border-radius:50%;animation:bounce 1.2s infinite;}
+  .typing-indicator span:nth-child(2){animation-delay:.2s;}
+  .typing-indicator span:nth-child(3){animation-delay:.4s;}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.35;}30%{transform:translateY(-5px);opacity:1;}}
+  #chips-wrap{padding:0 15px 10px;}
+  .chips-label{font-size:9px;color:#2A2A2A;font-family:'Syne',sans-serif;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px;}
+  .chips-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+  .chip{background:#0A0A0A;font-size:11px;padding:5px 11px;border-radius:20px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;border:1px solid #1E1E1E;color:var(--texto-sec);}
+  .chip.c-comercial:hover{border-color:var(--comercial);color:var(--comercial);}
+  .chip.c-contable:hover{border-color:var(--contable);color:var(--contable);}
+  .chip.c-finanzas:hover{border-color:var(--finanzas);color:var(--finanzas);}
+  .chip.c-legal:hover{border-color:var(--legal);color:var(--legal);}
+  #input-area{padding:13px 15px;border-top:1px solid var(--borde);display:flex;gap:9px;align-items:flex-end;}
+  #user-input{flex:1;background:#0A0A0A;border:1px solid #1E1E1E;border-radius:8px;padding:11px 14px;color:var(--blanco);font-family:'Inter',sans-serif;font-size:13.5px;resize:none;outline:none;min-height:43px;max-height:110px;line-height:1.5;transition:border-color .25s;}
+  #user-input:focus{border-color:#333;}
+  #user-input::placeholder{color:#252525;}
+  #user-input:disabled{opacity:.3;cursor:not-allowed;}
+  #send-btn{width:43px;height:43px;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .2s,transform .1s;background:linear-gradient(135deg,var(--comercial) 0%,var(--contable) 35%,var(--finanzas) 70%,var(--legal) 100%);}
+  #send-btn:hover{opacity:.82;}
+  #send-btn:active{transform:scale(.94);}
+  #send-btn:disabled{opacity:.2;cursor:default;}
+  #send-btn svg{width:16px;height:16px;fill:#fff;}
+  .footer{text-align:center;font-size:9px;color:#1E1E1E;padding:6px 0 3px;letter-spacing:1.5px;text-transform:uppercase;font-family:'Syne',sans-serif;}
+</style>
+</head>
+<body>
+
+<!-- MODAL LÍMITE -->
+<div id="modal-limite">
+  <div class="limite-box">
+    <div class="limite-icono">🔒</div>
+    <h2>Demo finalizada</h2>
+    <p>Usaste tus <span>10 consultas gratuitas</span>.<br>Contactanos para activar tu versión completa del Agente Integral M-AR.</p>
+    <a class="wa-btn" href="https://wa.me/5492396555555?text=Hola%20Marcos%2C%20quiero%20activar%20la%20versi%C3%B3n%20completa%20del%20Agente%20Integral%20M-AR" target="_blank">💬 Contactar por WhatsApp</a>
+    <a class="email-btn" href="mailto:marcosandresreynoso@gmail.com">📧 marcosandresreynoso@gmail.com</a>
+  </div>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-ring"></div><div class="logo-ring"></div>
+    <div class="logo-ring"></div><div class="logo-ring"></div>
+    <span>M-AR</span>
+  </div>
+  <div class="header-info">
+    <h1>Agente Integral — Demo</h1>
+    <p>Organización M-AR & Asociados · 4 módulos</p>
+  </div>
+  <div id="modo-badge"><div class="dot"></div><span id="modo-texto">Listo</span></div>
+</header>
+
+<div id="contador-bar">
+  <span class="contador-label">Consultas gratuitas: <span id="restantes">10</span> restantes</span>
+  <div class="puntos" id="puntos-bar"></div>
+</div>
+
+<div id="modulos-legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--comercial)"></div>Comercial</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--contable)"></div>Contable</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--finanzas)"></div>Finanzas</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--legal)"></div>Legal</div>
+</div>
+
+<div id="nav-modulos">
+  <button class="nav-btn activo-todos" id="btn-todos" onclick="filtrar('todos')">⬡ Todos</button>
+  <button class="nav-btn" id="btn-comercial" onclick="filtrar('comercial')">◈ Comercial</button>
+  <button class="nav-btn" id="btn-contable"  onclick="filtrar('contable')">◉ Contable</button>
+  <button class="nav-btn" id="btn-finanzas"  onclick="filtrar('finanzas')">◆ Finanzas</button>
+  <button class="nav-btn" id="btn-legal"     onclick="filtrar('legal')">◎ Legal</button>
+</div>
+
+<div id="chat"></div>
+
+<div id="chips-wrap">
+  <div class="chips-label">Consultas frecuentes</div>
+  <div class="chips-row">
+    <div class="chip c-comercial" onclick="enviarChip(this)">¿Cómo consigo mis primeros clientes?</div>
+    <div class="chip c-comercial" onclick="enviarChip(this)">¿Cómo armo mi propuesta de valor?</div>
+  </div>
+  <div class="chips-row">
+    <div class="chip c-contable" onclick="enviarChip(this)">¿Cómo me inscribo en AFIP?</div>
+    <div class="chip c-contable" onclick="enviarChip(this)">¿Qué categoría de monotributo me corresponde?</div>
+  </div>
+  <div class="chips-row">
+    <div class="chip c-finanzas" onclick="enviarChip(this)">¿Cómo organizo mis finanzas?</div>
+    <div class="chip c-finanzas" onclick="enviarChip(this)">¿Cómo precio mis servicios?</div>
+  </div>
+  <div class="chips-row">
+    <div class="chip c-legal" onclick="enviarChip(this)">¿Necesito un contrato para mis clientes?</div>
+    <div class="chip c-legal" onclick="enviarChip(this)">¿Cómo protejo mi trabajo intelectual?</div>
+  </div>
+</div>
+
+<div id="input-area">
+  <textarea id="user-input" placeholder="Consultá sobre tu negocio, finanzas, legal, AFIP..." rows="1"></textarea>
+  <button id="send-btn" onclick="enviar()">
+    <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+  </button>
+</div>
+<div class="footer">M-AR & Asociados · Demo gratuita · 10 consultas</div>
+
+<script>
+const SYSTEM_PROMPT = `Sos el Agente Integral de Organización M-AR & Asociados, empresa argentina con sede en General Villegas, Buenos Aires.
+
+Tenés CUATRO módulos especializados:
+
+MÓDULO COMERCIAL [etiqueta: COMERCIAL]
+- Propuesta de valor y posicionamiento personal
+- Estrategias para conseguir primeros clientes
+- Cómo cotizar y presentar presupuestos
+- Presencia digital: LinkedIn, Instagram, web
+
+MÓDULO CONTABLE [etiqueta: CONTABLE]
+- Monotributo: categorías A-K, vencimientos días 20-22 según CUIT
+- Facturación: tipos A, B, C, CAE, factura electrónica AFIP
+- AFIP: inscripción CUIT, clave fiscal, alta en monotributo
+
+MÓDULO FINANZAS [etiqueta: FINANZAS]
+- Separar finanzas personales de las del negocio
+- Cómo calcular el precio correcto de servicios
+- Fondo de emergencia, flujo de caja, ahorro e inversión en Argentina
+
+MÓDULO LEGAL [etiqueta: LEGAL]
+- Contratos de prestación de servicios
+- Propiedad intelectual: derechos de autor, marcas, INPI
+- Carta documento, términos y condiciones
+
+INSTRUCCIONES:
+1. Al inicio de cada respuesta ponés: [MÓDULO: COMERCIAL], [MÓDULO: CONTABLE], [MÓDULO: FINANZAS] o [MÓDULO: LEGAL]
+2. Tono: argentino, directo, cálido, de vos a vos
+3. Respuestas cortas 3-5 líneas
+4. Para acompañamiento completo: marcosandresreynoso@gmail.com`;
+
+const LIMITE = 10;
+let historial=[], cargando=false, modoActual="neutral";
+  let consultasUsadas = parseInt(localStorage.getItem("mar_consultas") || "0");
+
+const MODULOS={'COMERCIAL':'comercial','CONTABLE':'contable','FINANZAS':'finanzas','LEGAL':'legal'};
+const ETIQUETAS={comercial:'◈ Comercial',contable:'◉ Contable',finanzas:'◆ Finanzas',legal:'◎ Legal'};
+
+function actualizarPuntos(){
+  const bar=document.getElementById('puntos-bar');
+  const restantes=document.getElementById('restantes');
+  bar.innerHTML='';
+  restantes.textContent=LIMITE-consultasUsadas;
+  for(let i=0;i<LIMITE;i++){
+    const p=document.createElement('div');
+    p.className='punto'+(i<consultasUsadas?' activo':'');
+    bar.appendChild(p);
+  }
+}
+
+function mostrarLimite(){
+  document.getElementById('modal-limite').style.display='flex';
+  document.getElementById('user-input').disabled=true;
+  document.getElementById('send-btn').disabled=true;
+}
+
+function detectarModo(t){for(const[k,v]of Object.entries(MODULOS)){if(t.includes('[MÓDULO: '+k+']'))return v;}return modoActual;}
+function limpiarEtiqueta(t){return t.replace(/\[MÓDULO: COMERCIAL\]/g,'').replace(/\[MÓDULO: CONTABLE\]/g,'').replace(/\[MÓDULO: FINANZAS\]/g,'').replace(/\[MÓDULO: LEGAL\]/g,'').trim();}
+
+function actualizarBadge(modo){
+  const b=document.getElementById('modo-badge'),t=document.getElementById('modo-texto');
+  b.className='';
+  const n={comercial:'Comercial',contable:'Contable',finanzas:'Finanzas',legal:'Legal'};
+  if(n[modo]){b.classList.add(modo);t.textContent=n[modo];}else{t.textContent='Listo';}
+}
+
+function agregarMensaje(rol,texto,modo){
+  const chat=document.getElementById('chat');
+  const div=document.createElement('div');
+  div.className='msg '+rol;
+  if(rol==='agente'&&modo){div.classList.add('m-'+modo);div.dataset.modo=modo;}
+  const av=document.createElement('div');av.className='avatar';av.textContent=rol==='agente'?'M-AR':'VOS';
+  const bur=document.createElement('div');bur.className='burbuja';
+  if(rol==='agente'&&modo&&modo!=='neutral'){
+    const tag=document.createElement('div');tag.className='modulo-tag tag-'+modo;tag.textContent=ETIQUETAS[modo]||modo;
+    bur.appendChild(tag);const sp=document.createElement('div');sp.style.height='3px';bur.appendChild(sp);
+  }
+  bur.appendChild(document.createTextNode(texto));
+  div.appendChild(av);div.appendChild(bur);chat.appendChild(div);chat.scrollTop=chat.scrollHeight;
+}
+
+function mostrarTyping(){
+  const chat=document.getElementById('chat');
+  const div=document.createElement('div');div.className='msg agente m-'+modoActual;div.id='typing';
+  const av=document.createElement('div');av.className='avatar';av.textContent='M-AR';
+  const bur=document.createElement('div');bur.className='burbuja';
+  const cols={comercial:'var(--comercial)',contable:'var(--contable)',finanzas:'var(--finanzas)',legal:'var(--legal)'};
+  const c=cols[modoActual]||'#555';
+  bur.innerHTML='<div class="typing-indicator"><span style="background:'+c+'"></span><span style="background:'+c+'"></span><span style="background:'+c+'"></span></div>';
+  div.appendChild(av);div.appendChild(bur);chat.appendChild(div);chat.scrollTop=chat.scrollHeight;
+}
+
+function quitarTyping(){const el=document.getElementById('typing');if(el)el.remove();}
+
+function filtrar(modulo){
+  document.querySelectorAll('.nav-btn').forEach(b=>b.className='nav-btn');
+  document.getElementById('btn-'+modulo).classList.add('activo-'+modulo);
+  document.querySelectorAll('.msg.agente').forEach(msg=>{
+    msg.style.display=(modulo==='todos'||msg.dataset.modo===modulo||!msg.dataset.modo)?'':'none';
+  });
+}
+
+async function llamarAPI(msg){
+  historial.push({role:'user',content:msg});
+  mostrarTyping();cargando=true;document.getElementById('send-btn').disabled=true;
+  try{
+    const res=await fetch('/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system:SYSTEM_PROMPT,messages:historial})
+    });
+    const data=await res.json();
+    const raw=data.text||'No pude procesar eso.';
+    const modo=detectarModo(raw);const limpio=limpiarEtiqueta(raw);
+    modoActual=modo;actualizarBadge(modo);quitarTyping();
+    historial.push({role:'assistant',content:raw});agregarMensaje('agente',limpio,modo);
+  }catch(e){
+    quitarTyping();
+    agregarMensaje('agente','Error de conexión. Intentá de nuevo.','neutral');
+  }
+  cargando=false;
+  if(consultasUsadas<LIMITE) document.getElementById('send-btn').disabled=false;
+}
+
+async function enviar(){
+  if(cargando||consultasUsadas>=LIMITE)return;
+  const input=document.getElementById('user-input');const texto=input.value.trim();if(!texto)return;
+  document.getElementById('chips-wrap').style.display='none';
+  agregarMensaje('usuario',texto);input.value='';input.style.height='auto';
+  consultasUsadas++;
+  localStorage.setItem("mar_consultas", consultasUsadas);
+  actualizarPuntos();
+  await llamarAPI(texto);
+  if(consultasUsadas>=LIMITE) setTimeout(mostrarLimite,1500);
+}
+
+function enviarChip(chip){document.getElementById('user-input').value=chip.textContent;enviar();}
+
+document.getElementById('user-input').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();enviar();}
+});
+document.getElementById('user-input').addEventListener('input',function(){
+  this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';
+});
+
+window.addEventListener("load",()=>{
+  actualizarPuntos();
+  if(consultasUsadas>=LIMITE){ mostrarLimite(); return; }
+  actualizarPuntos();
+  setTimeout(()=>{
+    llamarAPI('Presentate brevemente como el Agente Integral de M-AR con 4 módulos y mencioná que esta es una demo gratuita de 10 consultas. Preguntá en qué área necesita ayuda.');
+  },500);
+});
+</script>
+</body>
+</html>
