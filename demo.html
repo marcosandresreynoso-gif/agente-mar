@@ -221,7 +221,8 @@ INSTRUCCIONES:
 4. Para acompañamiento completo: marcosandresreynoso@gmail.com`;
 
 const LIMITE = 10;
-let historial=[], cargando=false, modoActual='neutral', consultasUsadas=0;
+let historial=[], cargando=false, modoActual="neutral";
+  let consultasUsadas = parseInt(localStorage.getItem("mar_consultas") || "0");
 
 const MODULOS={'COMERCIAL':'comercial','CONTABLE':'contable','FINANZAS':'finanzas','LEGAL':'legal'};
 const ETIQUETAS={comercial:'◈ Comercial',contable:'◉ Contable',finanzas:'◆ Finanzas',legal:'◎ Legal'};
@@ -318,6 +319,7 @@ async function enviar(){
   document.getElementById('chips-wrap').style.display='none';
   agregarMensaje('usuario',texto);input.value='';input.style.height='auto';
   consultasUsadas++;
+  localStorage.setItem("mar_consultas", consultasUsadas);
   actualizarPuntos();
   await llamarAPI(texto);
   if(consultasUsadas>=LIMITE) setTimeout(mostrarLimite,1500);
@@ -332,7 +334,9 @@ document.getElementById('user-input').addEventListener('input',function(){
   this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';
 });
 
-window.addEventListener('load',()=>{
+window.addEventListener("load",()=>{
+  actualizarPuntos();
+  if(consultasUsadas>=LIMITE){ mostrarLimite(); return; }
   actualizarPuntos();
   setTimeout(()=>{
     llamarAPI('Presentate brevemente como el Agente Integral de M-AR con 4 módulos y mencioná que esta es una demo gratuita de 10 consultas. Preguntá en qué área necesita ayuda.');
