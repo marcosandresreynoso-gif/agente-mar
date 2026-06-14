@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M-AR & Asociados — Conseguimos clientes para tu empresa con IA</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
+
+  :root {
+    --negro:#0A0A0A;--blanco:#F7F5F0;
+    --acento:#C8A96E;--acento-s:#C8A96E18;
+    --verde:#4A9E7F;--verde-s:#4A9E7F18;
+    --texto-sec:#888;--borde:#1E1E1E;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{background:var(--negro);color:var(--blanco);font-family:'Inter',sans-serif;line-height:1.6;}
+
+  /* NAV */
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;background:#0A0A0Aee;backdrop-filter:blur(8px);border-bottom:1px solid #111;}
+  .nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:var(--acento);letter-spacing:1px;}
+  .nav-links{display:flex;gap:24px;align-items:center;}
+  .nav-links a{font-size:12px;color:var(--texto-sec);text-decoration:none;font-family:'Syne',sans-serif;letter-spacing:.5px;transition:color .2s;}
+  .nav-links a:hover{color:var(--blanco);}
+  .nav-cta{background:var(--acento);color:var(--negro);padding:8px 18px;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;letter-spacing:.8px;text-decoration:none;border-radius:3px;}
+
+  /* HERO */
+  .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:120px 24px 80px;position:relative;overflow:hidden;}
+  .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%, #C8A96E08 0%, transparent 70%);}
+  .hero-tag{display:inline-flex;align-items:center;gap:8px;border:1px solid #2A2A2A;padding:6px 14px;font-size:11px;color:var(--texto-sec);font-family:'Syne',sans-serif;letter-spacing:1px;text-transform:uppercase;margin-bottom:32px;}
+  .hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--verde);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .hero h1{font-family:'Syne',sans-serif;font-size:clamp(36px,6vw,72px);font-weight:800;line-height:1.05;margin-bottom:24px;max-width:800px;}
+  .hero h1 span{color:var(--acento);}
+  .hero p{font-size:clamp(15px,2vw,18px);color:var(--texto-sec);max-width:520px;margin-bottom:40px;line-height:1.7;}
+  .hero-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+  .btn-primary{background:var(--acento);color:var(--negro);padding:15px 32px;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;letter-spacing:.8px;text-decoration:none;border-radius:3px;transition:opacity .2s;}
+  .btn-primary:hover{opacity:.85;}
+  .btn-secondary{border:1px solid #2A2A2A;color:var(--blanco);padding:15px 32px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;letter-spacing:.8px;text-decoration:none;border-radius:3px;transition:all .2s;}
+  .btn-secondary:hover{border-color:var(--acento);color:var(--acento);}
+  .hero-stats{display:flex;gap:40px;margin-top:60px;flex-wrap:wrap;justify-content:center;}
+  .stat{text-align:center;}
+  .stat-num{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--acento);}
+  .stat-label{font-size:11px;color:var(--texto-sec);margin-top:4px;letter-spacing:.5px;}
+
+  /* SECCIONES */
+  section{padding:80px 24px;}
+  .container{max-width:1000px;margin:0 auto;}
+  .section-tag{font-family:'Syne',sans-serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--acento);margin-bottom:12px;}
+  .section-title{font-family:'Syne',sans-serif;font-size:clamp(24px,4vw,40px);font-weight:800;margin-bottom:16px;line-height:1.15;}
+  .section-sub{font-size:15px;color:var(--texto-sec);max-width:520px;line-height:1.7;}
+
+  /* CÓMO FUNCIONA */
+  .pasos{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;margin-top:48px;}
+  .paso{background:#111;border:1px solid var(--borde);padding:28px 24px;position:relative;}
+  .paso-num{font-family:'Syne',sans-serif;font-size:48px;font-weight:800;color:#1A1A1A;position:absolute;top:16px;right:20px;}
+  .paso-icon{font-size:28px;margin-bottom:14px;}
+  .paso h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:8px;}
+  .paso p{font-size:13px;color:var(--texto-sec);line-height:1.6;}
+
+  /* SERVICIOS */
+  .servicios{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:48px;}
+  .servicio{background:#0D0D0D;border:1px solid var(--borde);padding:32px 28px;transition:border-color .3s;}
+  .servicio:hover{border-color:var(--acento);}
+  .servicio-icon{width:44px;height:44px;background:var(--acento-s);border:1px solid var(--acento);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:20px;}
+  .servicio h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:10px;}
+  .servicio p{font-size:13px;color:var(--texto-sec);line-height:1.65;margin-bottom:16px;}
+  .servicio-precio{font-family:'Syne',sans-serif;font-size:13px;color:var(--acento);font-weight:700;}
+
+  /* PRUEBA SOCIAL */
+  .demo-box{background:#0D0D0D;border:1px solid var(--borde);padding:40px;text-align:center;margin-top:48px;}
+  .demo-box h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:10px;}
+  .demo-box p{font-size:14px;color:var(--texto-sec);margin-bottom:24px;}
+  .demo-links{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+  .demo-link{border:1px solid #2A2A2A;padding:10px 20px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;text-decoration:none;color:var(--blanco);transition:all .2s;border-radius:3px;}
+  .demo-link:hover{border-color:var(--acento);color:var(--acento);}
+  .demo-link.destacado{background:var(--verde);border-color:var(--verde);color:#fff;}
+  .demo-link.destacado:hover{opacity:.85;}
+
+  /* PRECIOS */
+  .precios{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-top:48px;}
+  .precio-card{background:#0D0D0D;border:1px solid var(--borde);padding:32px 28px;position:relative;}
+  .precio-card.destacado{border-color:var(--acento);}
+  .precio-badge{position:absolute;top:-1px;left:50%;transform:translateX(-50%);background:var(--acento);color:var(--negro);font-family:'Syne',sans-serif;font-size:9px;font-weight:800;letter-spacing:1px;padding:4px 12px;text-transform:uppercase;}
+  .precio-plan{font-family:'Syne',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--texto-sec);margin-bottom:12px;}
+  .precio-num{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;color:var(--blanco);line-height:1;}
+  .precio-num span{font-size:16px;color:var(--texto-sec);font-weight:400;}
+  .precio-desc{font-size:12px;color:var(--texto-sec);margin:12px 0 20px;}
+  .precio-items{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:24px;}
+  .precio-items li{font-size:12px;color:#BBB;display:flex;align-items:flex-start;gap:8px;}
+  .precio-items li::before{content:'✓';color:var(--verde);font-weight:700;flex-shrink:0;}
+  .precio-btn{display:block;text-align:center;padding:12px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;letter-spacing:.5px;text-decoration:none;border-radius:3px;transition:opacity .2s;}
+  .precio-btn.outline{border:1px solid #2A2A2A;color:var(--blanco);}
+  .precio-btn.outline:hover{border-color:var(--acento);color:var(--acento);}
+  .precio-btn.filled{background:var(--acento);color:var(--negro);}
+  .precio-btn.filled:hover{opacity:.85;}
+
+  /* CTA FINAL */
+  .cta-final{background:#0D0D0D;border:1px solid var(--borde);padding:64px 40px;text-align:center;margin-top:48px;}
+  .cta-final h2{font-family:'Syne',sans-serif;font-size:clamp(24px,4vw,40px);font-weight:800;margin-bottom:16px;}
+  .cta-final p{font-size:15px;color:var(--texto-sec);margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto;}
+  .cta-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+  .wa-btn{background:#25D366;color:#fff;padding:15px 28px;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;text-decoration:none;border-radius:3px;transition:opacity .2s;}
+  .wa-btn:hover{opacity:.88;}
+  .email-btn-cta{border:1px solid #2A2A2A;color:var(--blanco);padding:15px 28px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;text-decoration:none;border-radius:3px;transition:all .2s;}
+  .email-btn-cta:hover{border-color:var(--acento);color:var(--acento);}
+
+  /* FOOTER */
+  footer{padding:32px 24px;border-top:1px solid var(--borde);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;}
+  .footer-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:var(--acento);}
+  .footer-links{display:flex;gap:20px;}
+  .footer-links a{font-size:12px;color:var(--texto-sec);text-decoration:none;}
+  .footer-links a:hover{color:var(--blanco);}
+
+  /* DIVIDER */
+  .divider{height:1px;background:linear-gradient(90deg,transparent,var(--borde),transparent);margin:0;}
+
+  @media(max-width:600px){
+    .nav-links{display:none;}
+    .hero-stats{gap:24px;}
+    .cta-final{padding:40px 20px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">M-AR & ASOCIADOS</div>
+  <div class="nav-links">
+    <a href="#como-funciona">Cómo funciona</a>
+    <a href="#servicios">Servicios</a>
+    <a href="#precios">Precios</a>
+    <a href="#contacto" class="nav-cta">Contactar</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-tag"><div class="dot"></div>General Villegas, Buenos Aires · Argentina</div>
+  <h1>Conseguimos <span>clientes</span><br>para tu empresa<br>con Inteligencia Artificial</h1>
+  <p>Generamos bases de datos de empresas, enviamos mensajes personalizados por WhatsApp y email, y automatizamos tu proceso comercial. Todo el país.</p>
+  <div class="hero-btns">
+    <a href="#contacto" class="btn-primary">💬 Quiero más clientes</a>
+    <a href="https://agente-mar.onrender.com/demo" target="_blank" class="btn-secondary">Probar Agente IA gratis</a>
+  </div>
+  <div class="hero-stats">
+    <div class="stat">
+      <div class="stat-num">+1.000</div>
+      <div class="stat-label">Contactos por semana</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">100%</div>
+      <div class="stat-label">Automatizado</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">24/7</div>
+      <div class="stat-label">Agente IA activo</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">$0</div>
+      <div class="stat-label">Costo por contacto</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- CÓMO FUNCIONA -->
+<section id="como-funciona">
+  <div class="container">
+    <div class="section-tag">Proceso</div>
+    <h2 class="section-title">Cómo conseguimos<br>tus clientes</h2>
+    <p class="section-sub">Un sistema de 4 pasos completamente automatizado que trabaja mientras vos te enfocás en tu negocio.</p>
+
+    <div class="pasos">
+      <div class="paso">
+        <div class="paso-num">01</div>
+        <div class="paso-icon">🎯</div>
+        <h3>Definimos el perfil</h3>
+        <p>Identificamos el tipo de empresa ideal para tu negocio — zona, rubro, tamaño. Cuanto más específico, mejores resultados.</p>
+      </div>
+      <div class="paso">
+        <div class="paso-num">02</div>
+        <div class="paso-icon">🗄️</div>
+        <h3>Generamos la base</h3>
+        <p>Nuestra IA construye una base de datos con nombre, teléfono, email y web de cada empresa objetivo en todo el país.</p>
+      </div>
+      <div class="paso">
+        <div class="paso-num">03</div>
+        <div class="paso-icon">📤</div>
+        <h3>Contactamos</h3>
+        <p>Enviamos mensajes personalizados por WhatsApp y email con tu propuesta de valor, links y datos de contacto.</p>
+      </div>
+      <div class="paso">
+        <div class="paso-num">04</div>
+        <div class="paso-icon">📈</div>
+        <h3>Recibís respuestas</h3>
+        <p>Los interesados te contactan directamente a tu WhatsApp y email. Vos solo cerrás la venta.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SERVICIOS -->
+<section id="servicios">
+  <div class="container">
+    <div class="section-tag">Servicios</div>
+    <h2 class="section-title">Dos productos,<br>un solo objetivo</h2>
+    <p class="section-sub">Automatización comercial con IA y acceso a inversión inmobiliaria tokenizada.</p>
+
+    <div class="servicios">
+      <div class="servicio">
+        <div class="servicio-icon">🤖</div>
+        <h3>Prospección Comercial con IA</h3>
+        <p>Generamos bases de datos de empresas por zona y rubro en todo el país. Enviamos campañas masivas por WhatsApp y email con mensajes personalizados.</p>
+        <div class="servicio-precio">Desde USD 49/mes</div>
+      </div>
+      <div class="servicio">
+        <div class="servicio-icon">🏗️</div>
+        <h3>Agente IA Integral</h3>
+        <p>Un asistente inteligente con 4 módulos: Comercial, Contable, Finanzas y Legal. Atiende consultas, explica servicios y califica leads automáticamente.</p>
+        <div class="servicio-precio">Demo gratuita disponible</div>
+      </div>
+      <div class="servicio">
+        <div class="servicio-icon">🏘️</div>
+        <h3>Inversión Inmobiliaria — Martoken</h3>
+        <p>Acceso a inversión en activos inmobiliarios reales en General Villegas desde USD 100 por token, con rendimientos estimados del 8-9% anual en blockchain Polygon.</p>
+        <div class="servicio-precio">Desde USD 100 por token</div>
+      </div>
+    </div>
+
+    <!-- DEMO BOX -->
+    <div class="demo-box">
+      <h3>Probá nuestras plataformas ahora</h3>
+      <p>Accedé a una demo gratuita del Agente IA o conocé Martoken sin compromiso.</p>
+      <div class="demo-links">
+        <a href="https://agente-mar.onrender.com/demo" target="_blank" class="demo-link destacado">🤖 Probar Agente IA — Gratis</a>
+        <a href="https://martoken01.netlify.app/" target="_blank" class="demo-link">🏗️ Conocer Martoken</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- PRECIOS -->
+<section id="precios">
+  <div class="container">
+    <div class="section-tag">Inversión</div>
+    <h2 class="section-title">Planes de prospección</h2>
+    <p class="section-sub">Elegí el plan que se adapta al volumen de contactos que necesitás cada mes.</p>
+
+    <div class="precios">
+      <div class="precio-card">
+        <div class="precio-plan">Básico</div>
+        <div class="precio-num">USD 49<span>/mes</span></div>
+        <div class="precio-desc">Ideal para profesionales independientes</div>
+        <ul class="precio-items">
+          <li>500 contactos por mes</li>
+          <li>1 zona geográfica</li>
+          <li>1 rubro</li>
+          <li>Envío por WhatsApp y email</li>
+          <li>Exportación a Excel</li>
+          <li>Soporte por WhatsApp</li>
+        </ul>
+        <a href="https://wa.me/5492392446792?text=Hola%20Marcos,%20me%20interesa%20el%20Plan%20Básico%20de%20prospección" target="_blank" class="precio-btn outline">Consultar →</a>
+      </div>
+
+      <div class="precio-card destacado">
+        <div class="precio-badge">Más popular</div>
+        <div class="precio-plan">Pro</div>
+        <div class="precio-num">USD 99<span>/mes</span></div>
+        <div class="precio-desc">Para empresas en crecimiento</div>
+        <ul class="precio-items">
+          <li>2.000 contactos por mes</li>
+          <li>Todo el país</li>
+          <li>Todos los rubros</li>
+          <li>Envío por WhatsApp y email</li>
+          <li>Exportación a Excel</li>
+          <li>Agente IA incluido</li>
+          <li>Soporte prioritario</li>
+        </ul>
+        <a href="https://wa.me/5492392446792?text=Hola%20Marcos,%20me%20interesa%20el%20Plan%20Pro%20de%20prospección" target="_blank" class="precio-btn filled">Empezar ahora →</a>
+      </div>
+
+      <div class="precio-card">
+        <div class="precio-plan">Empresa</div>
+        <div class="precio-num">USD 299<span>/mes</span></div>
+        <div class="precio-desc">Solución completa y personalizada</div>
+        <ul class="precio-items">
+          <li>Contactos ilimitados</li>
+          <li>Todo el país</li>
+          <li>Campañas gestionadas por M-AR</li>
+          <li>Mensajes personalizados por rubro</li>
+          <li>Agente IA personalizado</li>
+          <li>Reportes mensuales</li>
+          <li>Reunión de estrategia mensual</li>
+        </ul>
+        <a href="https://wa.me/5492392446792?text=Hola%20Marcos,%20me%20interesa%20el%20Plan%20Empresa" target="_blank" class="precio-btn outline">Consultar →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- CTA FINAL -->
+<section id="contacto">
+  <div class="container">
+    <div class="cta-final">
+      <h2>¿Listo para conseguir<br>más clientes?</h2>
+      <p>Contactanos hoy y en 24 horas tenés tu primera campaña de prospección activa.</p>
+      <div class="cta-btns">
+        <a href="https://wa.me/5492392446792?text=Hola%20Marcos,%20quiero%20información%20sobre%20prospección%20comercial%20con%20IA" target="_blank" class="wa-btn">💬 WhatsApp: 2392446792</a>
+        <a href="mailto:marcosandresreynoso@gmail.com" class="email-btn-cta">📧 marcosandresreynoso@gmail.com</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">M-AR & ASOCIADOS</div>
+  <div class="footer-links">
+    <a href="https://agente-mar.onrender.com/demo" target="_blank">Agente IA Demo</a>
+    <a href="https://martoken01.netlify.app/" target="_blank">Martoken</a>
+    <a href="mailto:marcosandresreynoso@gmail.com">Email</a>
+  </div>
+  <div style="font-size:11px;color:#333;">General Villegas, Buenos Aires · Argentina</div>
+</footer>
+
+</body>
+</html>
