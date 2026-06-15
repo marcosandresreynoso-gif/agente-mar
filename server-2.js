@@ -1,6 +1,5 @@
 // server-2.js — M-AR & Asociados
-// Versión actualizada: Places API (New) + enriquecimiento de webs + calificación tier A/B/C
-// Mantiene todos los endpoints anteriores intactos.
+// Places API Legacy (la que ya tenés habilitada) + enriquecimiento web + calificación A/B/C
 
 const http = require('http');
 const fs = require('fs');
@@ -24,7 +23,7 @@ if (!fs.existsSync(CONTACTOS_FILE)) {
 
 // ═══════════════════════════════════════════════════════════
 // MÓDULO DE ENRIQUECIMIENTO
-// Entra a la web de cada empresa y saca mail/WhatsApp/teléfono/redes
+// Entra a la web de cada empresa y saca mail/WhatsApp/teléfono
 // ═══════════════════════════════════════════════════════════
 
 const UA = 'Mozilla/5.0 (compatible; MAR-LeadBot/1.0)';
@@ -40,13 +39,10 @@ function normalizeUrl(raw) {
 }
 
 async function fetchHtml(url) {
-  const { default: nodeFetch } = await import('node-fetch').catch(() => ({ default: null }));
-  const fetcher = nodeFetch || fetch;
-  if (!fetcher) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetcher(url, {
+    const res = await fetch(url, {
       headers: { 'User-Agent': UA, Accept: 'text/html' },
       signal: controller.signal,
       redirect: 'follow',
@@ -63,10 +59,9 @@ async function fetchHtml(url) {
 
 function extractEmails(html) {
   if (!html) return [];
-  // des-ofuscar
-  let t = html.replace(/\s*[\[\(]\s*(?:at|arroba)\s*[\]\)]\s*/gi, '@')
-               .replace(/\s*[\[\(]\s*(?:dot|punto)\s*[\]\)]\s*/gi, '.');
-  // mailto: primero (más confiable)
+  let t = html
+    .replace(/\s*[\[\(]\s*(?:at|arroba)\s*[\]\)]\s*/gi, '@')
+    .replace(/\s*[\[\(]\s*(?:dot|punto)\s*[\]\)]\s*/gi, '.');
   const mailtos = [...(t.matchAll(/href="mailto:([^"?]+)/gi))].map(m => m[1].toLowerCase());
   const plain = (t.match(EMAIL_RE) || []).map(e => e.toLowerCase());
   return [...new Set([...mailtos, ...plain])].filter(e => !JUNK_EMAIL.test(e));
@@ -83,7 +78,7 @@ function extractWhatsApp(html) {
 function extractPhones(html) {
   if (!html) return [];
   const links = [...(html.matchAll(/href="tel:([^"]+)"/gi))].map(m => m[1].replace(/[^\d+]/g, ''));
-  return [...new Set(links)].filter(p => p.replace(/\D/g,'').length >= 7);
+  return [...new Set(links)].filter(p => p.replace(/\D/g, '').length >= 7);
 }
 
 function findContactLinks(html, baseUrl) {
@@ -118,7 +113,6 @@ async function enrichEmpresa(empresa) {
   result.whatsappWeb = extractWhatsApp(homeHtml);
   result.phonesWeb = extractPhones(homeHtml);
 
-  // profundizar en página de contacto
   for (const link of findContactLinks(homeHtml, url)) {
     const html2 = await fetchHtml(link);
     if (!html2) continue;
@@ -130,17 +124,13 @@ async function enrichEmpresa(empresa) {
   return result;
 }
 
-// ═══════════════════════════════════════════════════════════
-// MÓDULO DE CALIFICACIÓN
-// ═══════════════════════════════════════════════════════════
-
 function scoreEmpresa(e) {
   let score = 0;
   if (e.emailsWeb?.length)    score += 35;
   if (e.whatsappWeb?.length)  score += 30;
   if (e.phonesWeb?.length || e.telefono) score += 15;
   if (e.webActiva)            score += 10;
-  if ((e.emailsWeb?.length||0) + (e.whatsappWeb?.length||0) >= 2) score += 10;
+  if ((e.emailsWeb?.length || 0) + (e.whatsappWeb?.length || 0) >= 2) score += 10;
   const tier = score >= 70 ? 'A' : score >= 45 ? 'B' : 'C';
   return { ...e, score: Math.min(100, score), tier };
 }
@@ -156,50 +146,60 @@ async function enrichBatch(empresas, concurrency = 3) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MÓDULO DE DESCUBRIMIENTO — Places API (New)
+// MÓDULO DE DESCUBRIMIENTO — Places API LEGACY
+// La que ya tenés habilitada, sin pago extra
 // ═══════════════════════════════════════════════════════════
 
-async function buscarPlacesNew(query, location, maxResults) {
-  const FIELD_MASK = [
-    'places.id',
-    'places.displayName',
-    'places.formattedAddress',
-    'places.websiteUri',
-    'places.nationalPhoneNumber',
-    'places.businessStatus',
-  ].join(',');
+async function buscarPlacesLegacy(query, location, maxResults) {
+  let empresas = [];
+  let pageToken = null;
+  const max = Math.min(maxResults, 20);
 
-  const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': MAPS_KEY,
-      'X-Goog-FieldMask': FIELD_MASK,
-    },
-    body: JSON.stringify({
-      textQuery: `${query} en ${location}`,
-      maxResultCount: Math.min(20, maxResults),
-      languageCode: 'es',
-      regionCode: 'AR',
-    }),
-  });
+  while (empresas.length < max) {
+    let url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' ' + location)}&key=${MAPS_KEY}&language=es`;
+    if (pageToken) url += `&pagetoken=${pageToken}`;
 
-  if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`Places API (New) error ${r.status}: ${txt.slice(0, 200)}`);
+    const r = await fetch(url);
+    const d = await r.json();
+
+    if (d.status === 'REQUEST_DENIED' || d.status === 'INVALID_REQUEST') {
+      throw new Error(`Google Maps error: ${d.status} — ${d.error_message || ''}`);
+    }
+
+    if (d.results) {
+      for (const p of d.results) {
+        if (empresas.length >= max) break;
+
+        // Detalles: teléfono + web en una sola llamada
+        const detUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${p.place_id}&fields=name,formatted_address,formatted_phone_number,website,types&key=${MAPS_KEY}&language=es`;
+        const detR = await fetch(detUrl);
+        const detD = await detR.json();
+        const det = detD.result || {};
+
+        empresas.push({
+          nombre: det.name || p.name || '',
+          rubro: (det.types || p.types || ['empresa'])[0].replace(/_/g, ' '),
+          direccion: det.formatted_address || p.formatted_address || '',
+          telefono: det.formatted_phone_number || '',
+          email: '',
+          web: det.website || '',
+          emailsWeb: [],
+          whatsappWeb: [],
+          phonesWeb: [],
+          webActiva: false,
+          tier: 'C',
+          score: 0,
+        });
+      }
+    }
+
+    pageToken = d.next_page_token;
+    if (!pageToken || empresas.length >= max) break;
+    // Google requiere esperar 2s antes de usar el next_page_token
+    await new Promise(r => setTimeout(r, 2000));
   }
 
-  const data = await r.json();
-  return (data.places || [])
-    .filter(p => p.businessStatus !== 'CLOSED_PERMANENTLY')
-    .map(p => ({
-      nombre: p.displayName?.text || '',
-      rubro: query,
-      direccion: p.formattedAddress || '',
-      telefono: p.nationalPhoneNumber || '',
-      email: '',
-      web: p.websiteUri || '',
-    }));
+  return empresas;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -212,7 +212,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // ── API CHAT (Groq) ──────────────────────────────────────
+  // ── CHAT (Groq) ──────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/chat') {
     let body = '';
     req.on('data', c => body += c);
@@ -232,19 +232,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── BUSCAR EMPRESAS: Places New + enriquecer + calificar ─
+  // ── BUSCAR: Legacy + enriquecer + calificar ──────────────
   if (req.method === 'POST' && req.url === '/buscar-empresas') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
         const { query, location, cantidad } = JSON.parse(body);
-        const maxResults = Math.min(cantidad || 20, 20); // Places New: máx 20 por llamada
 
-        // 1) Descubrir con Places API New
-        const encontradas = await buscarPlacesNew(query, location, maxResults);
+        // 1) Descubrir con Places Legacy
+        const encontradas = await buscarPlacesLegacy(query, location, cantidad || 20);
 
-        // 2) Enriquecer (entrar a cada web) + calificar
+        // 2) Enriquecer webs + calificar
         const leads = await enrichBatch(encontradas, 3);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -265,7 +264,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── GUARDAR CONTACTOS ENVIADOS ───────────────────────────
+  // ── GUARDAR CONTACTOS ────────────────────────────────────
   if (req.method === 'POST' && req.url === '/guardar-contactos') {
     let body = '';
     req.on('data', c => body += c);
@@ -283,7 +282,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── VER CONTACTOS ARCHIVADOS ─────────────────────────────
+  // ── VER CONTACTOS ────────────────────────────────────────
   if (req.method === 'GET' && req.url === '/ver-contactos') {
     try {
       const data = fs.readFileSync(CONTACTOS_FILE, 'utf8');
