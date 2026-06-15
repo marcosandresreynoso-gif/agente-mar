@@ -1,8 +1,8 @@
 {
   "name": "agente-mar",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "server-2.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server-2.js"
   }
 }
