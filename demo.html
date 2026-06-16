@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agente Integral — M-AR & Asociados</title>
+<title>Agente Integral — Demo — M-AR & Asociados</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap');
   :root {
@@ -44,7 +44,6 @@
   #modo-badge.finanzas{color:var(--finanzas);border-color:var(--finanzas);background:var(--finanzas-s);}
   #modo-badge.legal{color:var(--legal);border-color:var(--legal);background:var(--legal-s);}
 
-  /* BARRA CONTADOR */
   #contador-bar{display:flex;align-items:center;justify-content:space-between;padding:7px 18px;border-bottom:1px solid var(--borde);}
   .contador-label{font-size:10px;color:var(--texto-sec);font-family:'Syne',sans-serif;letter-spacing:.5px;}
   .contador-label span{color:var(--comercial);font-weight:700;}
@@ -110,11 +109,12 @@
   #send-btn:disabled{opacity:.2;cursor:default;}
   #send-btn svg{width:16px;height:16px;fill:#fff;}
   .footer{text-align:center;font-size:9px;color:#1E1E1E;padding:6px 0 3px;letter-spacing:1.5px;text-transform:uppercase;font-family:'Syne',sans-serif;}
+  #banner-espera{display:none;background:#0A0A0A;border:1px solid #C8A96E33;border-left:3px solid var(--comercial);padding:10px 14px;margin:10px 15px;font-size:12px;color:var(--texto-sec);border-radius:4px;font-family:'Syne',sans-serif;}
+  #banner-espera.visible{display:block;}
 </style>
 </head>
 <body>
 
-<!-- MODAL LÍMITE -->
 <div id="modal-limite">
   <div class="limite-box">
     <div class="limite-icono">🔒</div>
@@ -158,6 +158,7 @@
   <button class="nav-btn" id="btn-legal"     onclick="filtrar('legal')">◎ Legal</button>
 </div>
 
+<div id="banner-espera">⏳ El servidor está despertando. Reintentando automáticamente, esperá unos segundos...</div>
 <div id="chat"></div>
 
 <div id="chips-wrap">
@@ -221,8 +222,8 @@ INSTRUCCIONES:
 4. Para acompañamiento completo: marcosandresreynoso@gmail.com`;
 
 const LIMITE = 10;
-let historial=[], cargando=false, modoActual="neutral";
-  let consultasUsadas = parseInt(localStorage.getItem("mar_consultas") || "0");
+let historial=[], cargando=false, modoActual='neutral';
+let consultasUsadas = parseInt(localStorage.getItem('mar_consultas') || '0');
 
 const MODULOS={'COMERCIAL':'comercial','CONTABLE':'contable','FINANZAS':'finanzas','LEGAL':'legal'};
 const ETIQUETAS={comercial:'◈ Comercial',contable:'◉ Contable',finanzas:'◆ Finanzas',legal:'◎ Legal'};
@@ -291,35 +292,60 @@ function filtrar(modulo){
   });
 }
 
-async function llamarAPI(msg){
-  historial.push({role:'user',content:msg});
-  mostrarTyping();cargando=true;document.getElementById('send-btn').disabled=true;
-  try{
-    const res=await fetch('/chat',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({system:SYSTEM_PROMPT,messages:historial})
-    });
-    const data=await res.json();
-    const raw=data.text||'No pude procesar eso.';
-    const modo=detectarModo(raw);const limpio=limpiarEtiqueta(raw);
-    modoActual=modo;actualizarBadge(modo);quitarTyping();
-    historial.push({role:'assistant',content:raw});agregarMensaje('agente',limpio,modo);
-  }catch(e){
-    quitarTyping();
-    agregarMensaje('agente','Error de conexión. Intentá de nuevo.','neutral');
+// Llamada con reintento automático — igual que index.html
+async function llamarAPI(msg, reintentos=3) {
+  historial.push({role:'user', content:msg});
+  mostrarTyping();
+  cargando=true;
+  document.getElementById('send-btn').disabled=true;
+
+  for (let intento=1; intento<=reintentos; intento++) {
+    try {
+      const res = await fetch('/chat', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({system:SYSTEM_PROMPT, messages:historial})
+      });
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      const data = await res.json();
+      const raw = data.text || 'No pude procesar eso.';
+      const modo = detectarModo(raw);
+      const limpio = limpiarEtiqueta(raw);
+      modoActual=modo;
+      actualizarBadge(modo);
+      quitarTyping();
+      document.getElementById('banner-espera').classList.remove('visible');
+      historial.push({role:'assistant', content:raw});
+      agregarMensaje('agente', limpio, modo);
+      break;
+    } catch(e) {
+      if (intento < reintentos) {
+        document.getElementById('banner-espera').classList.add('visible');
+        await new Promise(r => setTimeout(r, 8000));
+      } else {
+        quitarTyping();
+        document.getElementById('banner-espera').classList.remove('visible');
+        agregarMensaje('agente','El servidor tardó en responder. Esperá unos segundos y volvé a intentarlo.','neutral');
+        historial.pop();
+      }
+    }
   }
+
   cargando=false;
-  if(consultasUsadas<LIMITE) document.getElementById('send-btn').disabled=false;
+  if (consultasUsadas < LIMITE) document.getElementById('send-btn').disabled=false;
 }
 
 async function enviar(){
-  if(cargando||consultasUsadas>=LIMITE)return;
-  const input=document.getElementById('user-input');const texto=input.value.trim();if(!texto)return;
+  if(cargando || consultasUsadas>=LIMITE) return;
+  const input=document.getElementById('user-input');
+  const texto=input.value.trim();
+  if(!texto) return;
   document.getElementById('chips-wrap').style.display='none';
-  agregarMensaje('usuario',texto);input.value='';input.style.height='auto';
+  agregarMensaje('usuario',texto);
+  input.value='';
+  input.style.height='auto';
   consultasUsadas++;
-  localStorage.setItem("mar_consultas", consultasUsadas);
+  localStorage.setItem('mar_consultas', consultasUsadas);
   actualizarPuntos();
   await llamarAPI(texto);
   if(consultasUsadas>=LIMITE) setTimeout(mostrarLimite,1500);
@@ -334,10 +360,9 @@ document.getElementById('user-input').addEventListener('input',function(){
   this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';
 });
 
-window.addEventListener("load",()=>{
+window.addEventListener('load',()=>{
   actualizarPuntos();
   if(consultasUsadas>=LIMITE){ mostrarLimite(); return; }
-  actualizarPuntos();
   setTimeout(()=>{
     llamarAPI('Presentate brevemente como el Agente Integral de M-AR con 4 módulos y mencioná que esta es una demo gratuita de 10 consultas. Preguntá en qué área necesita ayuda.');
   },500);
