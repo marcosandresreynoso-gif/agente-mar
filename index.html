@@ -89,6 +89,9 @@
   #send-btn:disabled{opacity:.2;cursor:default;}
   #send-btn svg{width:16px;height:16px;fill:#fff;}
   .footer{text-align:center;font-size:9px;color:#1E1E1E;padding:6px 0 3px;letter-spacing:1.5px;text-transform:uppercase;font-family:'Syne',sans-serif;}
+  /* banner de espera cuando el servidor duerme */
+  #banner-espera{display:none;background:#0A0A0A;border:1px solid #C8A96E33;border-left:3px solid var(--comercial);padding:10px 14px;margin:10px 15px;font-size:12px;color:var(--texto-sec);border-radius:4px;font-family:'Syne',sans-serif;}
+  #banner-espera.visible{display:block;}
 </style>
 </head>
 <body>
@@ -117,6 +120,7 @@
   <button class="nav-btn" id="btn-finanzas"  onclick="filtrar('finanzas')">◆ Finanzas</button>
   <button class="nav-btn" id="btn-legal"     onclick="filtrar('legal')">◎ Legal</button>
 </div>
+<div id="banner-espera">⏳ El servidor está despertando (plan gratuito). Reintentando automáticamente, por favor esperá unos segundos...</div>
 <div id="chat"></div>
 <div id="chips-wrap">
   <div class="chips-label">Consultas frecuentes</div>
@@ -235,32 +239,64 @@ function filtrar(modulo){
   });
 }
 
-async function llamarAPI(msg){
+// Llamada con reintento automático si el servidor está durmiendo
+async function llamarAPI(msg, reintentos = 3) {
   historial.push({role:'user',content:msg});
-  mostrarTyping();cargando=true;document.getElementById('send-btn').disabled=true;
-  try{
-    const res=await fetch('/chat',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({system:SYSTEM_PROMPT,messages:historial})
-    });
-    const data=await res.json();
-    const raw=data.text||'No pude procesar eso. Intentá de nuevo.';
-    const modo=detectarModo(raw);const limpio=limpiarEtiqueta(raw);
-    modoActual=modo;actualizarBadge(modo);quitarTyping();
-    historial.push({role:'assistant',content:raw});agregarMensaje('agente',limpio,modo);
-  }catch(e){
-    quitarTyping();
-    agregarMensaje('agente','Error de conexión. Intentá de nuevo.','neutral');
+  mostrarTyping();
+  cargando=true;
+  document.getElementById('send-btn').disabled=true;
+
+  for (let intento = 1; intento <= reintentos; intento++) {
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({system: SYSTEM_PROMPT, messages: historial})
+      });
+
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      const data = await res.json();
+      const raw = data.text || 'No pude procesar eso. Intentá de nuevo.';
+      const modo = detectarModo(raw);
+      const limpio = limpiarEtiqueta(raw);
+
+      modoActual = modo;
+      actualizarBadge(modo);
+      quitarTyping();
+      document.getElementById('banner-espera').classList.remove('visible');
+      historial.push({role:'assistant', content:raw});
+      agregarMensaje('agente', limpio, modo);
+      break; // éxito, salir del loop
+
+    } catch(e) {
+      if (intento < reintentos) {
+        // servidor durmiendo — mostrar banner y esperar
+        document.getElementById('banner-espera').classList.add('visible');
+        await new Promise(r => setTimeout(r, 8000)); // esperar 8 segundos
+      } else {
+        // agotamos reintentos
+        quitarTyping();
+        document.getElementById('banner-espera').classList.remove('visible');
+        agregarMensaje('agente', 'El servidor tardó demasiado en responder. Esperá unos segundos y volvé a intentarlo.', 'neutral');
+        historial.pop(); // sacar el mensaje del usuario que falló
+      }
+    }
   }
-  cargando=false;document.getElementById('send-btn').disabled=false;
+
+  cargando=false;
+  document.getElementById('send-btn').disabled=false;
 }
 
 async function enviar(){
   if(cargando)return;
-  const input=document.getElementById('user-input');const texto=input.value.trim();if(!texto)return;
+  const input=document.getElementById('user-input');
+  const texto=input.value.trim();
+  if(!texto)return;
   document.getElementById('chips-wrap').style.display='none';
-  agregarMensaje('usuario',texto);input.value='';input.style.height='auto';
+  agregarMensaje('usuario',texto);
+  input.value='';
+  input.style.height='auto';
   await llamarAPI(texto);
 }
 
@@ -281,4 +317,3 @@ window.addEventListener('load',()=>{
 </script>
 </body>
 </html>
-
