@@ -1,6 +1,6 @@
 // server-2.js — M-AR & Asociados — CON ROTACIÓN DE KEYS GROQ
 // Rota automáticamente entre GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3, GROQ_API_KEY_4
-// Si una key llega al límite diario, usa la siguiente automáticamente
+// Buscador hasta 500 empresas con Google Maps (paginación automática)
 
 const http = require('http');
 const fs = require('fs');
@@ -40,7 +40,6 @@ function nextGroqKey() {
   return key;
 }
 
-// Llama a Groq con rotación automática: si una key devuelve 429 (límite), prueba la siguiente
 async function llamarGroq(payload, intentos = GROQ_KEYS.length) {
   for (let i = 0; i < intentos; i++) {
     const key = nextGroqKey();
@@ -50,7 +49,7 @@ async function llamarGroq(payload, intentos = GROQ_KEYS.length) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify(payload),
       });
-      if (r.status === 429) continue; // límite alcanzado, próxima key
+      if (r.status === 429) continue;
       const d = await r.json();
       return d;
     } catch (e) {
@@ -119,13 +118,13 @@ Códigos de área típicos de ${ciudad}. Devolvé solo el JSON.`;
 }
 
 // ═══════════════════════════════════════════════════════════
-// MÓDULO GOOGLE MAPS — se activa cuando MAPS_KEY funciona
+// MÓDULO GOOGLE MAPS — hasta 500 resultados con paginación
 // ═══════════════════════════════════════════════════════════
 
 async function buscarGoogleMaps(query, location, cantidad) {
   let empresas = [];
   let pageToken = null;
-  const max = Math.min(cantidad, 20);
+  const max = Math.min(cantidad, 500); // hasta 500
 
   while (empresas.length < max) {
     let url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ' ' + location)}&key=${MAPS_KEY}&language=es`;
@@ -157,7 +156,9 @@ async function buscarGoogleMaps(query, location, cantidad) {
     }
 
     pageToken = d.next_page_token;
+    // Si no hay más páginas o ya llegamos al máximo, paramos
     if (!pageToken || empresas.length >= max) break;
+    // Google requiere esperar 2s antes de usar el next_page_token
     await new Promise(r => setTimeout(r, 2000));
   }
 
@@ -295,7 +296,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── BUSCAR EMPRESAS (Maps → fallback IA) ─────────────────
+  // ── BUSCAR EMPRESAS (Maps hasta 500 → fallback IA) ────────
   if (req.method === 'POST' && req.url === '/buscar-empresas') {
     let body = '';
     req.on('data', c => body += c);
