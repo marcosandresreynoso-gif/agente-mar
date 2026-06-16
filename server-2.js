@@ -1,14 +1,12 @@
-// server-2.js — M-AR & Asociados — VERSIÓN DEFINITIVA
-// Modo IA: funciona ahora mismo con Groq
-// Modo Maps: se activa solo cuando la tarjeta de Google esté cargada
-// + enriquecimiento web + calificación A/B/C
+// server-2.js — M-AR & Asociados — CON ROTACIÓN DE KEYS GROQ
+// Rota automáticamente entre GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3, GROQ_API_KEY_4
+// Si una key llega al límite diario, usa la siguiente automáticamente
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const GROQ_KEY = process.env.GROQ_API_KEY;
 const MAPS_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
 const MIME = {
@@ -21,6 +19,45 @@ const MIME = {
 const CONTACTOS_FILE = path.join(__dirname, 'contactos-enviados.json');
 if (!fs.existsSync(CONTACTOS_FILE)) {
   fs.writeFileSync(CONTACTOS_FILE, JSON.stringify({ whatsapp: [], email: [] }, null, 2));
+}
+
+// ═══════════════════════════════════════════════════════════
+// ROTACIÓN DE KEYS GROQ
+// ═══════════════════════════════════════════════════════════
+
+const GROQ_KEYS = [
+  process.env.GROQ_API_KEY,
+  process.env.GROQ_API_KEY_2,
+  process.env.GROQ_API_KEY_3,
+  process.env.GROQ_API_KEY_4,
+].filter(Boolean);
+
+let keyIndex = 0;
+
+function nextGroqKey() {
+  const key = GROQ_KEYS[keyIndex % GROQ_KEYS.length];
+  keyIndex++;
+  return key;
+}
+
+// Llama a Groq con rotación automática: si una key devuelve 429 (límite), prueba la siguiente
+async function llamarGroq(payload, intentos = GROQ_KEYS.length) {
+  for (let i = 0; i < intentos; i++) {
+    const key = nextGroqKey();
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify(payload),
+      });
+      if (r.status === 429) continue; // límite alcanzado, próxima key
+      const d = await r.json();
+      return d;
+    } catch (e) {
+      if (i === intentos - 1) throw e;
+    }
+  }
+  throw new Error('Todas las keys de Groq están al límite. Intentá en unos minutos.');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -55,20 +92,15 @@ Lote ${i + 1} de ${tandas}. Empresas diferentes a las anteriores.
 Códigos de área típicos de ${ciudad}. Devolvé solo el JSON.`;
 
     try {
-      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 2000,
-          temperature: 0.7,
-          messages: [
-            { role: 'system', content: SYSTEM_IA },
-            { role: 'user', content: prompt }
-          ]
-        }),
+      const d = await llamarGroq({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 2000,
+        temperature: 0.7,
+        messages: [
+          { role: 'system', content: SYSTEM_IA },
+          { role: 'user', content: prompt }
+        ]
       });
-      const d = await r.json();
       const text = d.choices?.[0]?.message?.content || '';
       const clean = text.replace(/```json|```/g, '').trim();
       const match = clean.match(/\{[\s\S]*\}/);
@@ -133,7 +165,7 @@ async function buscarGoogleMaps(query, location, cantidad) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// ENRIQUECIMIENTO WEB — entra a cada web y saca contactos
+// ENRIQUECIMIENTO WEB
 // ═══════════════════════════════════════════════════════════
 
 const UA = 'Mozilla/5.0 (compatible; MAR-LeadBot/1.0)';
@@ -244,19 +276,18 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // ── CHAT (Groq) ──────────────────────────────────────────
+  // ── CHAT (Groq con rotación) ──────────────────────────────
   if (req.method === 'POST' && req.url === '/chat') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
         const { system, messages } = JSON.parse(body);
-        const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
-          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', max_tokens: 1000, messages: [{ role: 'system', content: system }, ...messages] }),
+        const d = await llamarGroq({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 1000,
+          messages: [{ role: 'system', content: system }, ...messages]
         });
-        const d = await r.json();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ text: d.choices?.[0]?.message?.content || 'Error' }));
       } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
@@ -264,8 +295,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── BUSCAR EMPRESAS ──────────────────────────────────────
-  // Intenta Maps primero, si falla cae a IA automáticamente
+  // ── BUSCAR EMPRESAS (Maps → fallback IA) ─────────────────
   if (req.method === 'POST' && req.url === '/buscar-empresas') {
     let body = '';
     req.on('data', c => body += c);
@@ -275,44 +305,28 @@ const server = http.createServer(async (req, res) => {
         let empresas = [];
         let fuenteUsada = 'ia';
 
-        // Intentar Maps solo si hay key y el usuario eligió maps
         if (fuente === 'maps' && MAPS_KEY) {
           try {
             empresas = await buscarGoogleMaps(query, location, cantidad);
             fuenteUsada = 'maps';
           } catch (e) {
             if (e.message === 'MAPS_DENIED') {
-              // Maps no disponible, caemos a IA
-              empresas = await generarEmpresasIA(location.replace(' Argentina',''), query, cantidad);
+              empresas = await generarEmpresasIA(location.replace(' Argentina', ''), query, cantidad);
               fuenteUsada = 'ia_fallback';
-            } else {
-              throw e;
-            }
+            } else throw e;
           }
         } else {
-          // Modo IA directo
-          empresas = await generarEmpresasIA(location.replace(' Argentina',''), query, cantidad);
+          empresas = await generarEmpresasIA(location.replace(' Argentina', ''), query, cantidad);
           fuenteUsada = 'ia';
         }
 
-        // Enriquecer webs que tengan URL
         const leads = await enrichBatch(empresas, 3);
-
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          empresas: leads,
-          fuenteUsada,
-          resumen: {
-            total: leads.length,
-            A: leads.filter(l => l.tier === 'A').length,
-            B: leads.filter(l => l.tier === 'B').length,
-            C: leads.filter(l => l.tier === 'C').length,
-          }
+          empresas: leads, fuenteUsada,
+          resumen: { total: leads.length, A: leads.filter(l => l.tier === 'A').length, B: leads.filter(l => l.tier === 'B').length, C: leads.filter(l => l.tier === 'C').length }
         }));
-      } catch (e) {
-        res.writeHead(500);
-        res.end(JSON.stringify({ error: e.message }));
-      }
+      } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
     });
     return;
   }
@@ -362,4 +376,4 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(404); res.end('Not found');
 });
 
-server.listen(PORT, () => console.log(`M-AR servidor en puerto ${PORT}`));
+server.listen(PORT, () => console.log(`M-AR servidor en puerto ${PORT} — ${GROQ_KEYS.length} keys Groq cargadas`));
