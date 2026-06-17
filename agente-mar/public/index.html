@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agente Integral — M-AR & Asociados</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-inner">
+      <div class="logo">M-AR</div>
+      <div>
+        <h1>Agente Integral</h1>
+        <div class="sub">Organización M-AR &amp; Asociados</div>
+      </div>
+      <div class="status"><span class="dot" id="dot"></span><span id="statusText">Conectando…</span></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="modules" id="modules"></div>
+
+    <div class="chat" id="chat">
+      <div class="msg agent">
+        <div class="av">⬡</div>
+        <div class="bubble">Hola. Soy el Agente Integral de M-AR &amp; Asociados. Te puedo ayudar con lo comercial, contable, financiero y legal. ¿Qué necesitás resolver?</div>
+      </div>
+
+      <div class="suggest" id="suggest">
+        <div class="lbl">Consultas frecuentes</div>
+        <div class="chips" id="chips"></div>
+      </div>
+    </div>
+  </main>
+
+  <div class="composer">
+    <div class="composer-inner">
+      <div class="actions">
+        <button class="action-btn" id="btnLead">＋ Dejar mis datos</button>
+        <button class="action-btn" id="btnTurno">🗓 Agendar una reunión</button>
+      </div>
+      <div class="input-row">
+        <textarea id="input" rows="1" placeholder="Escribí tu consulta…"></textarea>
+        <button class="send" id="send">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Lead -->
+  <div class="overlay" id="overlayLead">
+    <div class="modal">
+      <h3>Dejá tus datos</h3>
+      <p class="hint">Un asesor sigue la conversación con vos.</p>
+      <div class="field"><label>Nombre</label><input id="l_nombre" /></div>
+      <div class="field"><label>Teléfono / WhatsApp</label><input id="l_telefono" /></div>
+      <div class="field"><label>Email</label><input id="l_email" type="email" /></div>
+      <div class="field"><label>Empresa (opcional)</label><input id="l_empresa" /></div>
+      <div class="field"><label>¿Qué necesitás?</label><textarea id="l_interes" rows="2"></textarea></div>
+      <div id="leadMsg"></div>
+      <div class="modal-actions">
+        <button class="btn-primary" id="l_save">Enviar mis datos</button>
+        <button class="btn-ghost" data-close="overlayLead">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Turno -->
+  <div class="overlay" id="overlayTurno">
+    <div class="modal">
+      <h3>Agendar una reunión</h3>
+      <p class="hint">Coordinamos y te confirmamos por email o WhatsApp.</p>
+      <div class="field"><label>Nombre</label><input id="t_nombre" /></div>
+      <div class="field"><label>Email</label><input id="t_email" type="email" /></div>
+      <div class="field"><label>Teléfono / WhatsApp</label><input id="t_telefono" /></div>
+      <div class="field"><label>Fecha preferida</label><input id="t_fecha" type="date" /></div>
+      <div class="field"><label>Hora preferida</label><input id="t_hora" type="time" /></div>
+      <div class="field"><label>Motivo</label><textarea id="t_motivo" rows="2"></textarea></div>
+      <div id="turnoMsg"></div>
+      <div class="modal-actions">
+        <button class="btn-primary" id="t_save">Solicitar turno</button>
+        <button class="btn-ghost" data-close="overlayTurno">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

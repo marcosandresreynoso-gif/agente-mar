@@ -1,0 +1,38 @@
+# render.yaml — Configuración de despliegue en Render
+# Render lee este archivo automáticamente al conectar el repositorio.
+services:
+  - type: web
+    name: agente-mar
+    runtime: node
+    plan: free                # Cambiá a "starter" si querés que el servidor no se duerma
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false           # la cargás a mano en el panel de Render (es secreta)
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: ADMIN_PASSWORD
+        sync: false           # tu contraseña del panel
+      - key: WEB3FORMS_KEY
+        sync: false           # para avisos por email de leads/turnos/reportes
+      - key: REPORT_TOKEN
+        sync: false           # token para disparar el reporte semanal con un cron externo
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_ID
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: DATA_DIR
+        value: /var/data       # se usa solo si agregás un disco persistente (ver abajo)
+
+# --- PERSISTENCIA (opcional, requiere plan pago) ---
+# En plan free los datos se reinician con cada deploy. Para que leads, conversaciones
+# y documentos queden guardados para siempre, agregá un disco descomentando esto y
+# subiendo el plan a "starter":
+#
+#    disk:
+#      name: agente-data
+#      mountPath: /var/data
+#      sizeGB: 1

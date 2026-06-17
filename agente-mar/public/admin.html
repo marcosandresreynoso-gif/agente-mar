@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel — Agente M-AR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 18px 0; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+    .tab { font-family: var(--mono); font-size: 13px; padding: 8px 14px; border-radius: 9px; cursor: pointer; color: var(--muted); border: 1px solid transparent; }
+    .tab.active { color: var(--text); background: var(--accent-soft); border-color: var(--accent); }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+    .card .k { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .card .v { font-size: 30px; font-weight: 700; margin-top: 6px; }
+    .card .v small { font-size: 13px; color: var(--muted); font-weight: 400; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th, td { text-align: left; padding: 10px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    tr:hover td { background: var(--panel); }
+    .pane { display: none; }
+    .pane.active { display: block; }
+    .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .btn { background: var(--accent); color: #fff; border: none; border-radius: 9px; padding: 9px 15px; font-weight: 600; cursor: pointer; font-size: 13px; }
+    .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+    .btn.small { padding: 5px 10px; font-size: 12px; }
+    .report-box { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; white-space: pre-wrap; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; max-height: 480px; overflow: auto; }
+    .login-wrap { max-width: 360px; margin: 14vh auto; }
+    .badge { font-family: var(--mono); font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); }
+    .badge.pend { color: var(--warn); border-color: var(--warn); }
+    .badge.conf { color: var(--ok); border-color: var(--ok); }
+    .upload-zone { border: 1px dashed var(--line); border-radius: var(--radius); padding: 22px; text-align: center; color: var(--muted); margin-bottom: 16px; }
+    select.mini, input.mini { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 6px 10px; font-size: 13px; }
+    .empty { color: var(--muted); padding: 30px; text-align: center; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="login">
+    <div class="login-wrap">
+      <div class="logo" style="margin: 0 auto 16px;">M-AR</div>
+      <h2 style="text-align:center; margin:0 0 18px;">Panel de administración</h2>
+      <div class="field"><label>Contraseña</label><input id="pass" type="password" /></div>
+      <div id="loginMsg"></div>
+      <button class="btn" style="width:100%; margin-top:8px;" id="loginBtn">Entrar</button>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app" style="display:none;">
+    <header class="bar">
+      <div class="bar-inner" style="max-width:1080px;">
+        <div class="logo">M-AR</div>
+        <div><h1>Panel del Agente</h1><div class="sub">Administración · M-AR &amp; Asociados</div></div>
+        <div class="status"><a href="/" target="_blank">Ver agente ↗</a>&nbsp;·&nbsp;<a href="#" id="logout">Salir</a></div>
+      </div>
+    </header>
+
+    <main class="wrap-wide">
+      <div class="tabs" id="tabs"></div>
+
+      <div class="pane active" data-pane="resumen">
+        <div class="cards" id="cards"></div>
+        <div class="toolbar">
+          <select class="mini" id="repDays"><option value="7">Últimos 7 días</option><option value="30">Últimos 30 días</option></select>
+          <button class="btn ghost" id="genReport">Generar reporte</button>
+          <button class="btn ghost" id="sendReport">Generar y enviar por email</button>
+        </div>
+        <div class="report-box" id="reportBox">Generá un reporte para ver consultas, temas frecuentes y leads del período.</div>
+      </div>
+
+      <div class="pane" data-pane="leads">
+        <div class="toolbar">
+          <button class="btn" id="exportCsv">Descargar Excel (CSV)</button>
+          <span class="status" id="leadCount"></span>
+        </div>
+        <div id="leadsTable"></div>
+      </div>
+
+      <div class="pane" data-pane="conversaciones">
+        <div id="consultasTable"></div>
+      </div>
+
+      <div class="pane" data-pane="documentos">
+        <div class="upload-zone">
+          <p style="margin:0 0 12px;">Subí PDFs, catálogos, contratos o manuales. El agente responderá usando esa información.</p>
+          <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; align-items:center;">
+            <input type="file" id="file" accept=".pdf,.txt,.md" />
+            <select class="mini" id="docModulo">
+              <option value="todos">Todos los módulos</option>
+              <option value="comercial">Comercial</option>
+              <option value="contable">Contable</option>
+              <option value="finanzas">Finanzas</option>
+              <option value="legal">Legal</option>
+            </select>
+            <button class="btn" id="uploadBtn">Cargar documento</button>
+          </div>
+          <div id="uploadMsg" style="margin-top:10px;"></div>
+        </div>
+        <div id="docsTable"></div>
+      </div>
+
+      <div class="pane" data-pane="turnos">
+        <div id="turnosTable"></div>
+      </div>
+
+      <div class="pane" data-pane="config">
+        <div id="configForm"></div>
+        <button class="btn" id="saveConfig" style="margin-top:14px;">Guardar configuración</button>
+        <div id="configMsg" style="margin-top:10px;"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
