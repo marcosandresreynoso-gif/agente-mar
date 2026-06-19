@@ -87,5 +87,21 @@
   </div>
 
   <script src="app.js"></script>
+
+  <!-- Asistente de voz Recepción M-AR (Vapi) -->
+  <script src="https://unpkg.com/@vapi-ai/client-sdk-react/dist/embed/widget.umd.js" async type="text/javascript"></script>
+
+  <vapi-widget
+    public-key="e5897d5f-d789-4e57-9de8-8baa602245ba"
+    assistant-id="b8ab8a51d93-01fd-4a4d-ab23-62d45809dcb4"
+    mode="voice"
+    theme="dark"
+    size="compact"
+    position="bottom-left"
+    accent-color="#3B82F6"
+    main-label="Recepción M-AR"
+    start-button-text="Hablar"
+    end-button-text="Terminar"
+  ></vapi-widget>
 </body>
 </html>
