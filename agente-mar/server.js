@@ -204,6 +204,100 @@ app.get('/api/admin/report', requireAdmin, async (req, res) => {
   }
 });
 
+/* ---------------------- IMPORTAR LEADS DESDE EL BUSCADOR ---------------------- */
+// Recibe empresas contactadas desde buscador-empresas-mar y las guarda como leads.
+// Protegido con el mismo ADMIN_PASSWORD. Manda UN solo aviso por lote (no uno por empresa).
+app.post('/api/leads/import', async (req, res) => {
+  try {
+    const { token, empresas, canal } = req.body || {};
+
+    if (!process.env.ADMIN_PASSWORD) {
+      return res.status(500).json({ error: 'ADMIN_PASSWORD no configurada en el servidor.' });
+    }
+    if (token !== process.env.ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'No autorizado.' });
+    }
+    if (!Array.isArray(empresas) || empresas.length === 0) {
+      return res.status(400).json({ error: 'No se recibió ninguna empresa.' });
+    }
+
+    const fuente = canal === 'email' ? 'buscador-email' : 'buscador-whatsapp';
+    const ins = db.prepare(
+      `INSERT INTO leads (created_at, nombre, telefono, email, empresa, interes, fuente, session_id, notas)
+       VALUES (?,?,?,?,?,?,?,?,?)`
+    );
+
+    let guardados = 0;
+    let repetidos = 0;
+
+    const tx = db.transaction(() => {
+      for (const e of empresas) {
+        const telefono = (e.telefono || '').trim() || null;
+        const email = (e.email || '').trim() || null;
+        const empresa = (e.nombre || '').trim() || null;
+
+        // Evitar duplicados por teléfono o email
+        if (telefono || email) {
+          const yaEsta = db
+            .prepare(
+              `SELECT id FROM leads WHERE
+                 (telefono IS NOT NULL AND telefono = @t) OR
+                 (email IS NOT NULL AND email = @e)
+               LIMIT 1`
+            )
+            .get({ t: telefono || '', e: email || '' });
+          if (yaEsta) {
+            repetidos++;
+            continue;
+          }
+        }
+
+        const notas = [
+          e.rubro ? `Rubro: ${e.rubro}` : null,
+          e.direccion ? `Dirección: ${e.direccion}` : null,
+          e.web ? `Web: ${e.web}` : null,
+        ]
+          .filter(Boolean)
+          .join(' | ') || null;
+
+        ins.run(
+          now(),
+          empresa,          // usamos el nombre de la empresa como nombre del lead
+          telefono,
+          email,
+          empresa,
+          'Prospección saliente',
+          fuente,
+          null,
+          notas
+        );
+        guardados++;
+      }
+    });
+    tx();
+
+    // Un solo aviso por lote
+    if (guardados > 0) {
+      notifyEmail(
+        `${guardados} lead(s) importado(s) desde el buscador`,
+        [
+          `Canal: ${canal === 'email' ? 'Email' : 'WhatsApp'}`,
+          `Nuevos: ${guardados}`,
+          `Ya existían: ${repetidos}`,
+          '',
+          'Empresas:',
+          ...empresas.slice(0, 50).map((e) => `- ${e.nombre || 's/n'} ${e.telefono || e.email || ''}`),
+        ].join('\n')
+      ).catch(() => {});
+    }
+
+    res.json({ ok: true, guardados, repetidos });
+  } catch (e) {
+    console.error('[/api/leads/import] ERROR:', e && e.stack ? e.stack : e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 /* ---------------------- HEALTH ---------------------- */
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: now() }));
 
