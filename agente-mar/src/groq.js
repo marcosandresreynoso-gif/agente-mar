@@ -5,6 +5,37 @@ const rag = require('./rag');
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
+// Rotación de keys Groq — usa GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3, GROQ_API_KEY_4
+// Si una key está al límite (429), pasa automáticamente a la siguiente.
+const GROQ_KEYS = [
+  process.env.GROQ_API_KEY,
+  process.env.GROQ_API_KEY_2,
+  process.env.GROQ_API_KEY_3,
+  process.env.GROQ_API_KEY_4,
+].filter(Boolean);
+
+let keyIndex = 0;
+function nextKey() {
+  const key = GROQ_KEYS[keyIndex % GROQ_KEYS.length];
+  keyIndex++;
+  return key;
+}
+
+async function fetchGroq(body, intentos = Math.max(GROQ_KEYS.length, 1)) {
+  if (GROQ_KEYS.length === 0) throw new Error('No hay ninguna GROQ_API_KEY configurada.');
+  for (let i = 0; i < intentos; i++) {
+    const key = nextKey();
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify(body)
+    });
+    if (res.status === 429) continue; // key al límite → siguiente
+    return res;
+  }
+  throw new Error('Todas las keys de Groq están al límite. Intentá en unos minutos.');
+}
+
 const MODULOS = {
   comercial: {
     nombre: 'Comercial',
@@ -56,9 +87,6 @@ function systemPrompt(modulo, contexto) {
 }
 
 async function chat({ modulo = 'todos', message, history = [] }) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error('Falta GROQ_API_KEY en las variables de entorno.');
-
   // Recuperar fragmentos relevantes de los documentos cargados
   let contexto = '';
   try {
@@ -76,18 +104,11 @@ async function chat({ modulo = 'todos', message, history = [] }) {
     { role: 'user', content: String(message).slice(0, 4000) }
   ];
 
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: msgs,
-      temperature: 0.4,
-      max_tokens: 900
-    })
+  const res = await fetchGroq({
+    model: MODEL,
+    messages: msgs,
+    temperature: 0.4,
+    max_tokens: 900
   });
 
   if (!res.ok) {
@@ -100,8 +121,6 @@ async function chat({ modulo = 'todos', message, history = [] }) {
 
 // Llamada genérica al modelo (para extracción de leads y reportes)
 async function complete(systemMsg, userMsg, { json = false, maxTokens = 700 } = {}) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error('Falta GROQ_API_KEY.');
   const body = {
     model: MODEL,
     messages: [
@@ -113,11 +132,7 @@ async function complete(systemMsg, userMsg, { json = false, maxTokens = 700 } = 
   };
   if (json) body.response_format = { type: 'json_object' };
 
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify(body)
-  });
+  const res = await fetchGroq(body);
   if (!res.ok) throw new Error(`Groq ${res.status}`);
   const data = await res.json();
   return data.choices?.[0]?.message?.content?.trim() || '';
