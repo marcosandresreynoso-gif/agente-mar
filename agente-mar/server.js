@@ -209,7 +209,7 @@ app.get('/api/admin/report', requireAdmin, async (req, res) => {
 // Protegido con el mismo ADMIN_PASSWORD. Manda UN solo aviso por lote (no uno por empresa).
 app.post('/api/leads/import', async (req, res) => {
   try {
-    const { token, empresas, canal } = req.body || {};
+    const { token, empresas, canal, campania } = req.body || {};
 
     if (!process.env.ADMIN_PASSWORD) {
       return res.status(500).json({ error: 'ADMIN_PASSWORD no configurada en el servidor.' });
@@ -221,7 +221,11 @@ app.post('/api/leads/import', async (req, res) => {
       return res.status(400).json({ error: 'No se recibió ninguna empresa.' });
     }
 
-    const fuente = canal === 'email' ? 'buscador-email' : 'buscador-whatsapp';
+    // La fuente incluye la campaña para poder separar los leads de cada negocio
+    // (ej: 'marvil-email', 'martoken-whatsapp').
+    const camp = (campania || 'martoken').toString().slice(0, 20);
+    const via = canal === 'email' ? 'email' : 'whatsapp';
+    const fuente = `${camp}-${via}`;
     const ins = db.prepare(
       `INSERT INTO leads (created_at, nombre, telefono, email, empresa, interes, fuente, session_id, notas)
        VALUES (?,?,?,?,?,?,?,?,?)`
@@ -281,6 +285,7 @@ app.post('/api/leads/import', async (req, res) => {
       notifyEmail(
         `${guardados} lead(s) importado(s) desde el buscador`,
         [
+          `Campaña: ${camp}`,
           `Canal: ${canal === 'email' ? 'Email' : 'WhatsApp'}`,
           `Nuevos: ${guardados}`,
           `Ya existían: ${repetidos}`,
