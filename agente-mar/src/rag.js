@@ -110,4 +110,45 @@ function deleteDoc(id) {
   db.prepare('DELETE FROM documentos WHERE id = ?').run(id);
 }
 
-module.exports = { indexDocument, retrieve, listDocs, deleteDoc };
+// Carga automática de documentos base del repositorio.
+// El plan Free de Render borra el disco al reiniciar, así que la base SQLite
+// se vacía cada tanto. Esta función revisa al arrancar si los documentos base
+// (los que viven en la carpeta /conocimiento del repo) están indexados, y si no,
+// los vuelve a indexar solo. Así el agente nunca se queda sin su conocimiento.
+function seedFromRepo() {
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(__dirname, '..', 'conocimiento');
+
+  if (!fs.existsSync(dir)) return { cargados: 0, motivo: 'no existe la carpeta /conocimiento' };
+
+  let cargados = 0;
+  const archivos = fs.readdirSync(dir).filter((f) => /\.(md|txt)$/i.test(f));
+
+  for (const archivo of archivos) {
+    // ¿Ya está indexado este archivo?
+    const yaEsta = db
+      .prepare('SELECT id FROM documentos WHERE nombre_archivo = ?')
+      .get(archivo);
+    if (yaEsta) continue;
+
+    try {
+      const text = fs.readFileSync(path.join(dir, archivo), 'utf8');
+      if (!text.trim()) continue;
+      indexDocument({
+        nombre_archivo: archivo,
+        titulo: archivo.replace(/\.(md|txt)$/i, '').replace(/[-_]/g, ' '),
+        modulo: 'todos',
+        text,
+      });
+      cargados++;
+      console.log(`[RAG] Documento base indexado: ${archivo}`);
+    } catch (e) {
+      console.error(`[RAG] No se pudo indexar ${archivo}:`, e.message);
+    }
+  }
+
+  return { cargados, total: archivos.length };
+}
+
+module.exports = { indexDocument, retrieve, listDocs, deleteDoc, seedFromRepo };
