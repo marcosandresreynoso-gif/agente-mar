@@ -3,7 +3,7 @@ const { getConfig } = require('./db');
 const rag = require('./rag');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 // Rotación de keys Groq — usa GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3, GROQ_API_KEY_4
 // Si una key está al límite (429), pasa automáticamente a la siguiente.
