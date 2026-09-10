@@ -49,6 +49,8 @@ app.post('/api/chat', async (req, res) => {
 
     res.json({ reply });
   } catch (e) {
+    // Logueamos el error completo para poder verlo en los logs de Render
+    console.error('[/api/chat] ERROR:', e && e.stack ? e.stack : e);
     res.status(500).json({ error: e.message || 'Error en el servidor.' });
   }
 });
@@ -206,4 +208,14 @@ app.get('/api/admin/report', requireAdmin, async (req, res) => {
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: now() }));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Agente Integral M-AR escuchando en :${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Agente Integral M-AR escuchando en :${PORT}`);
+  // Carga los documentos base del repo si no están indexados.
+  // Necesario porque el disco del plan Free se borra al reiniciar.
+  try {
+    const r = rag.seedFromRepo();
+    if (r.cargados > 0) console.log(`[RAG] ${r.cargados} documento(s) base cargado(s) al arrancar.`);
+  } catch (e) {
+    console.error('[RAG] Error al cargar documentos base:', e.message);
+  }
+});
