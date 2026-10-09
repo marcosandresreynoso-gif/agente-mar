@@ -2,7 +2,6 @@
 // Requiere GOOGLE_MAPS_API_KEY con "Places API" habilitada y facturación activa en Google Cloud.
 const { normalizarTelefono } = require('./telefono');
 
-const BASE = 'https://maps.googleapis.com/maps/api/place';
 
 // Argentina: el número internacional de un celular trae el 9 después del 54 ("+54 9 2388 ...").
 function tipoTelefono(internacional, local) {
@@ -24,52 +23,43 @@ async function buscarEmpresas({ rubro, localidad, cantidad = 20 }) {
   if (!rubro || !localidad) throw new Error('Completá rubro y localidad.');
   const max = Math.min(Math.max(parseInt(cantidad, 10) || 20, 1), 60);
 
-  const lugares = [];
-  let pageToken = null;
-  for (let pagina = 0; pagina < 3 && lugares.length < max; pagina++) {
-    let url = `${BASE}/textsearch/json?query=${encodeURIComponent(`${rubro} en ${localidad}`)}&language=es&region=ar&key=${key}`;
-    if (pageToken) url = `${BASE}/textsearch/json?pagetoken=${pageToken}&key=${key}`;
-    const d = await (await fetch(url)).json();
-    if (d.status === 'REQUEST_DENIED') throw new Error('Google rechazó la búsqueda: ' + (d.error_message || 'revisá que la clave tenga habilitada "Places API" y facturación activa.'));
-    if (d.status === 'OVER_QUERY_LIMIT') throw new Error('Se alcanzó el límite de búsquedas de Google por hoy.');
-    for (const p of d.results || []) {
-      if (lugares.length >= max) break;
-      lugares.push(p);
-    }
-    pageToken = d.next_page_token;
-    if (!pageToken) break;
-    await new Promise((ok) => setTimeout(ok, 2000)); // Google exige esperar antes de pedir la página siguiente
-  }
-
-  // Detalles (teléfono) en paralelo, de a 5
+  // Places API (New): una sola llamada ya trae el teléfono. Hasta 20 por página, 3 páginas.
+  const campos = 'places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,places.businessStatus,nextPageToken';
   const out = [];
-  for (let i = 0; i < lugares.length; i += 5) {
-    const tanda = lugares.slice(i, i + 5);
-    const dets = await Promise.all(
-      tanda.map(async (p) => {
-        try {
-          const u = `${BASE}/details/json?place_id=${p.place_id}&fields=name,formatted_address,formatted_phone_number,international_phone_number,website,business_status&language=es&key=${key}`;
-          return (await (await fetch(u)).json()).result || {};
-        } catch {
-          return {};
-        }
-      })
-    );
-    tanda.forEach((p, j) => {
-      const det = dets[j];
-      if (det.business_status && det.business_status !== 'OPERATIONAL') return;
-      const tipo = tipoTelefono(det.international_phone_number, det.formatted_phone_number);
+  let pageToken = '';
+  for (let pagina = 0; pagina < 3 && out.length < max; pagina++) {
+    const body = { textQuery: `${rubro} en ${localidad}, Argentina`, languageCode: 'es', regionCode: 'AR', pageSize: 20 };
+    if (pageToken) body.pageToken = pageToken;
+    const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': campos },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.error) {
+      const msg = d.error?.message || `Error ${r.status}`;
+      if (/not been used|disabled|PERMISSION_DENIED|API key not valid/i.test(msg + (d.error?.status || ''))) {
+        throw new Error('Google rechazó la búsqueda: habilitá "Places API (New)" en el proyecto de la clave y revisá que la clave en Render sea la nueva. (' + msg + ')');
+      }
+      throw new Error('Google Maps: ' + msg);
+    }
+    for (const p of d.places || []) {
+      if (out.length >= max) break;
+      if (p.businessStatus && p.businessStatus !== 'OPERATIONAL') continue;
+      const tipo = tipoTelefono(p.internationalPhoneNumber, p.nationalPhoneNumber);
       out.push({
-        nombre: det.name || p.name || '',
+        nombre: p.displayName?.text || '',
         rubro,
         localidad,
-        direccion: det.formatted_address || p.formatted_address || '',
-        telefono_vista: det.formatted_phone_number || '',
+        direccion: p.formattedAddress || '',
+        telefono_vista: p.nationalPhoneNumber || p.internationalPhoneNumber || '',
         tipo_telefono: tipo,
-        whatsapp: telefonoWhatsApp(det.international_phone_number, tipo),
-        web: det.website || ''
+        whatsapp: telefonoWhatsApp(p.internationalPhoneNumber, tipo),
+        web: p.websiteUri || ''
       });
-    });
+    }
+    pageToken = d.nextPageToken || '';
+    if (!pageToken) break;
   }
   return out;
 }
