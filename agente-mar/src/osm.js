@@ -91,16 +91,19 @@ async function buscarOSM({ rubro, localidad, cantidad = 60, radioKm = 8 }) {
   const r0 = sinTildes(rubro);
 
   const etiquetas = (RUBROS.find(([re]) => re.test(r0)) || [null, []])[1];
+  const area = `(around:${radio},${lat},${lon})`;
   const filtrosTag = etiquetas.map((t) => {
     const [k, v] = t.split('=');
-    return `nwr(around:${radio},${lat},${lon})["${k}"="${v}"];`;
+    return `nwr["${k}"="${v}"]${area};`;
   });
-  // Además, cualquier comercio cuyo nombre contenga la palabra buscada
+  // Además, comercios cuyo nombre contenga la palabra buscada (consulta liviana, por tipo)
   const palabra = r0.replace(/[^a-z0-9 ]/g, '').split(' ').filter((p) => p.length > 3)[0] || r0;
-  const raiz = palabra.length > 6 ? palabra.slice(0, palabra.length - 2) : palabra;
-  const filtroNombre = `nwr(around:${radio},${lat},${lon})["name"~"${raiz}",i][~"^(shop|office|amenity|craft|tourism)$"~"."];`;
+  const raiz = (palabra.length > 6 ? palabra.slice(0, palabra.length - 2) : palabra).replace(/[^a-z0-9]/g, '');
+  const filtrosNombre = raiz.length >= 4
+    ? ['shop', 'office', 'amenity', 'craft'].map((k) => `nwr["${k}"]["name"~"${raiz}",i]${area};`)
+    : [];
 
-  const query = `[out:json][timeout:25];(${filtrosTag.join('')}${filtroNombre});out center tags 400;`;
+  const query = `[out:json][timeout:25];(${filtrosTag.join('')}${filtrosNombre.join('')});out center tags 300;`;
   const d = await overpass(query);
 
   const out = [];
