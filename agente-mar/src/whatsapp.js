@@ -117,11 +117,36 @@ async function graphPost(pathname, body) {
   return data;
 }
 
+// Argentina: WhatsApp identifica al cliente como 549+área+número, pero la lista de destinatarios
+// del número de prueba de Meta lo guarda como 54+área+15+número. Si Meta rechaza por "no está en la
+// lista" (131030), probamos esas variantes.
+function variantesArgentina(tel) {
+  if (!/^549\d{10}$/.test(tel)) return [];
+  const n = tel.slice(3);
+  return [2, 3, 4].map((a) => '54' + n.slice(0, a) + '15' + n.slice(a));
+}
+
 async function enviarAMeta(payload) {
   const { token, phoneId } = credenciales();
   if (!token || !phoneId) throw new Error('Faltan WHATSAPP_TOKEN o WHATSAPP_PHONE_ID en Render.');
-  const data = await graphPost(`${phoneId}/messages`, { messaging_product: 'whatsapp', recipient_type: 'individual', ...payload });
-  return data.messages?.[0]?.id || null;
+  const base = { messaging_product: 'whatsapp', recipient_type: 'individual', ...payload };
+  try {
+    const data = await graphPost(`${phoneId}/messages`, base);
+    return data.messages?.[0]?.id || null;
+  } catch (e) {
+    console.error(`[WA] error al enviar a ${payload.to}: (${e.code}) ${e.message}`);
+    if (e.code !== 131030) throw e;
+    for (const alt of variantesArgentina(payload.to)) {
+      try {
+        const data = await graphPost(`${phoneId}/messages`, { ...base, to: alt });
+        console.log(`[WA] enviado usando formato alternativo ${alt}`);
+        return data.messages?.[0]?.id || null;
+      } catch (e2) {
+        if (e2.code !== 131030) throw e2;
+      }
+    }
+    throw e;
+  }
 }
 
 // Texto libre: solo dentro de la ventana de 24 hs
