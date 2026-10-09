@@ -83,3 +83,47 @@ async function buscarPaginasAmarillas({ rubro, localidad, cantidad = 30 }) {
 }
 
 module.exports = { buscarPaginasAmarillas, esCelular };
+
+// Usa el buscador-empresas-mar (Render Starter, con Chrome) como fuente de Páginas Amarillas.
+// Descarta los resultados inventados por IA que el buscador devuelve cuando falla.
+async function buscarConBuscadorMar({ rubro, localidad, cantidad = 30 }) {
+  const base = (process.env.BUSCADOR_URL || 'https://buscador-empresas-mar.onrender.com').replace(/\/$/, '');
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 120000);
+  let d;
+  try {
+    const r = await fetch(`${base}/buscar-empresas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: rubro, location: `${localidad} Argentina`, cantidad: Math.min(parseInt(cantidad, 10) || 30, 30), fuente: 'paginas_amarillas' }),
+      signal: ctrl.signal
+    });
+    d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || `El buscador respondió ${r.status}`);
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? 'El buscador tardó demasiado (puede estar arrancando). Probá de nuevo en un minuto.' : 'No pude usar el buscador: ' + e.message);
+  } finally {
+    clearTimeout(t);
+  }
+  if (String(d.fuenteUsada || '').startsWith('ia')) {
+    throw new Error('El buscador no pudo leer Páginas Amarillas para esa búsqueda (sus resultados de respaldo son inventados, así que los descarto). Probá otro rubro o localidad.');
+  }
+  return (d.empresas || []).map((e) => {
+    const telefonos = [e.whatsapp, e.telefono].filter(Boolean);
+    const celular = e.whatsapp || telefonos.find(esCelular) || '';
+    const wa = celular ? normalizarTelefono(celular) : null;
+    return {
+      nombre: e.nombre || 'Sin nombre',
+      rubro,
+      localidad,
+      direccion: e.direccion || '',
+      telefono_vista: celular || e.telefono || '',
+      tipo_telefono: wa ? (e.whatsapp ? 'whatsapp' : 'celular') : (e.telefono ? 'fijo' : ''),
+      whatsapp: wa,
+      web: e.web || '',
+      email: e.email || ''
+    };
+  });
+}
+
+module.exports.buscarConBuscadorMar = buscarConBuscadorMar;

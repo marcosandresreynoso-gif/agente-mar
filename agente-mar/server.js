@@ -193,10 +193,12 @@ const { normalizarTelefono } = require('./src/telefono');
 
 app.post('/api/admin/wa/buscar', requireAdmin, async (req, res) => {
   try {
-    const fuente = (req.body || {}).fuente === 'maps' ? 'maps' : 'pa';
+    const fuente = (req.body || {}).fuente;
     const lista = fuente === 'maps'
       ? await require('./src/maps').buscarEmpresas(req.body || {})
-      : await require('./src/paginas').buscarPaginasAmarillas(req.body || {});
+      : fuente === 'pa'
+        ? await require('./src/paginas').buscarPaginasAmarillas(req.body || {})
+        : await require('./src/paginas').buscarConBuscadorMar(req.body || {});
     // Marcar las que ya están en contactos
     res.json(lista.map((e) => ({ ...e, ya_cargada: !!(e.whatsapp && whatsapp.getContacto(e.whatsapp)) })));
   } catch (e) {
