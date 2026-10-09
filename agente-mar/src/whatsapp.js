@@ -530,14 +530,11 @@ async function diagnostico() {
     return out;
   }
   try {
-    let subs = await get(`${wabaId}/subscribed_apps`);
-    if (!subs.data || !subs.data.length) {
-      await graphPost(`${wabaId}/subscribed_apps`, {});
-      subs = await get(`${wabaId}/subscribed_apps`);
-      paso('Cuenta suscripta a la app', !!(subs.data && subs.data.length), 'No estaba suscripta: la suscribí ahora ✅');
-    } else {
-      paso('Cuenta suscripta a la app', true, 'Ya estaba suscripta: ' + subs.data.map((a) => a.whatsapp_business_api_data?.name || a.name || 'app').join(', '));
-    }
+    // Suscribe SIEMPRE la app dueña del token (es idempotente). Puede haber otras apps de Meta suscriptas.
+    await graphPost(`${wabaId}/subscribed_apps`, {});
+    const subs = await get(`${wabaId}/subscribed_apps`);
+    const nombres = (subs.data || []).map((a) => a.whatsapp_business_api_data?.name || a.name || 'app');
+    paso('Cuenta suscripta a la app', nombres.length > 0, 'Apps suscriptas ahora: ' + nombres.join(', '));
   } catch (e) {
     paso('Cuenta suscripta a la app', false, e.message);
   }
