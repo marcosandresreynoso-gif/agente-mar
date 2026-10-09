@@ -194,7 +194,9 @@ const { normalizarTelefono } = require('./src/telefono');
 app.post('/api/admin/wa/buscar', requireAdmin, async (req, res) => {
   try {
     const fuente = (req.body || {}).fuente;
-    const lista = fuente === 'maps'
+    const lista = fuente === 'osm'
+      ? await require('./src/osm').buscarOSM(req.body || {})
+      : fuente === 'maps'
       ? await require('./src/maps').buscarEmpresas(req.body || {})
       : fuente === 'pa'
         ? await require('./src/paginas').buscarPaginasAmarillas(req.body || {})
