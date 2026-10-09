@@ -381,6 +381,17 @@ function encolar(tel, fn) {
   return next;
 }
 
+const FUENTES_COMERCIALES = ['anuncio', 'buscador', 'manual'];
+function modoBot() {
+  return getConfig().wa_bot_modo === 'todos' ? 'todos' : 'comercial';
+}
+function esChatComercial(tel, referral) {
+  if (modoBot() === 'todos') return true;
+  if (referral) return true;
+  const c = getContacto(tel);
+  return !!(c && FUENTES_COMERCIALES.includes(c.fuente));
+}
+
 async function procesarEntrante(msg, perfil) {
   const tel = normalizarTelefono(msg.from) || msg.from;
   const texto = textoDeMensaje(msg);
@@ -389,6 +400,10 @@ async function procesarEntrante(msg, perfil) {
 
   // Evitar procesar dos veces el mismo mensaje (Meta reintenta)
   if (msg.id && db.prepare('SELECT 1 FROM wa_mensajes WHERE wa_id = ?').get(msg.id)) return;
+
+  // Modo "comercial" (por defecto): con un número personal conectado, solo se atiende a quien llegó
+  // por un anuncio o fue cargado desde el buscador / a mano. Los chats personales se ignoran por completo.
+  if (!esChatComercial(tel, referral)) return;
 
   const { creado, contacto: c0 } = upsertContacto(tel, {
     nombre: perfil?.name,
@@ -492,6 +507,7 @@ async function procesarEntrante(msg, perfil) {
 function procesarEco(eco) {
   const tel = normalizarTelefono(eco.to) || eco.to;
   if (eco.id && db.prepare('SELECT 1 FROM wa_mensajes WHERE wa_id = ?').get(eco.id)) return;
+  if (!esChatComercial(tel, null)) return; // chats personales: no se guardan
   upsertContacto(tel, { fuente: 'whatsapp' });
   guardarMensaje({ telefono: tel, direccion: 'out', autor: 'celular', tipo: eco.type, contenido: textoDeMensaje(eco), wa_id: eco.id, estado: 'sent' });
   // Marcos tomó la conversación: el bot se calla un rato con este contacto
@@ -604,6 +620,7 @@ function resumen() {
       disco_persistente: !!process.env.DATA_DIR && process.env.DATA_DIR.startsWith('/var/data')
     },
     bot_activo: cfg.wa_bot_activo !== '0',
+    modo: modoBot(),
     instrucciones: cfg.wa_instrucciones || '',
     limite_diario: limiteDiario(),
     envios_hoy: enviosHoy(),

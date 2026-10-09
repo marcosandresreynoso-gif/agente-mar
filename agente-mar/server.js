@@ -272,9 +272,10 @@ app.post('/api/admin/wa/campania', requireAdmin, (req, res) => {
 app.get('/api/admin/wa/campania', requireAdmin, (req, res) => res.json(whatsapp.estadoCampania()));
 
 app.post('/api/admin/wa/config', requireAdmin, (req, res) => {
-  const { bot_activo, instrucciones, limite_diario } = req.body || {};
+  const { bot_activo, instrucciones, limite_diario, modo } = req.body || {};
   const c = {};
   if (bot_activo !== undefined) c.wa_bot_activo = bot_activo ? '1' : '0';
+  if (modo) c.wa_bot_modo = modo === 'todos' ? 'todos' : 'comercial';
   if (instrucciones !== undefined) c.wa_instrucciones = String(instrucciones).slice(0, 4000);
   if (limite_diario !== undefined) {
     const n = Math.min(Math.max(parseInt(limite_diario, 10) || 30, 1), 1000);

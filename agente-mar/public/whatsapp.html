@@ -191,6 +191,11 @@
         <div class="card">
           <h3>Bot</h3>
           <label class="check"><input type="checkbox" id="botActivo" /> El bot responde automáticamente</label>
+          <label class="muted" style="display:block;margin-top:8px">¿A quién atiende el bot?</label>
+          <select class="mini" id="modo" style="width:100%;margin:4px 0 6px">
+            <option value="comercial">Solo gente de anuncios y contactos del buscador (recomendado con número personal)</option>
+            <option value="todos">A todos los que escriban</option>
+          </select>
           <p class="muted" style="margin:4px 0 12px">Si respondés vos desde el celular, el bot se calla 12 hs con esa persona. Si alguien pide hablar con una persona, el bot se pausa con ese contacto y te llega un mail.</p>
           <label class="muted">Instrucciones del bot de WhatsApp</label>
           <textarea class="mini" id="instr" rows="10"></textarea>

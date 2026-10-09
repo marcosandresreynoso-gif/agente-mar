@@ -312,12 +312,13 @@ async function cargarAjustes() {
   $('checklist').innerHTML = items.map(([k, t]) => `<div class="check">${r.configurado[k] ? '✅' : '⬜'} ${t}</div>`).join('');
   $('hookUrl').textContent = location.origin + '/webhook/whatsapp';
   $('botActivo').checked = r.bot_activo;
+  $('modo').value = r.modo || 'comercial';
   $('instr').value = r.instrucciones;
   $('limite').value = r.limite_diario;
 }
 $('guardarAj').onclick = async () => {
   try {
-    await post('/api/admin/wa/config', { bot_activo: $('botActivo').checked, instrucciones: $('instr').value, limite_diario: $('limite').value });
+    await post('/api/admin/wa/config', { bot_activo: $('botActivo').checked, modo: $('modo').value, instrucciones: $('instr').value, limite_diario: $('limite').value });
     $('ajMsg').textContent = 'Guardado ✓';
     cargarResumen();
     setTimeout(() => ($('ajMsg').textContent = ''), 2000);

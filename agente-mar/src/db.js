@@ -114,6 +114,7 @@ function initDb() {
     tono: 'Directo, claro y práctico. Español rioplatense. Sin rodeos.',
     // WhatsApp M-AR
     wa_bot_activo: '1',
+    wa_bot_modo: 'comercial',
     wa_limite_diario: '30',
     wa_instrucciones:
       'Atendés por WhatsApp a personas que llegaron por los anuncios de MARTOKEN en Facebook e Instagram. ' +
