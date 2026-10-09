@@ -57,6 +57,11 @@ const MODULOS = {
     foco:
       'Contratos, protección de propiedad intelectual, formas societarias, fideicomisos y riesgos legales del emprendedor.'
   },
+  martoken: {
+    nombre: 'MARTOKEN (WhatsApp)',
+    foco:
+      'MARTOKEN: tokenización inmobiliaria sobre Polygon, el proyecto MAR-01, cómo invertir, cómo se genera el retorno, respaldo legal en fideicomiso.'
+  },
   todos: {
     nombre: 'Integral',
     foco:
@@ -64,7 +69,7 @@ const MODULOS = {
   }
 };
 
-function systemPrompt(modulo, contexto) {
+function systemPrompt(modulo, contexto, extra) {
   const cfg = getConfig();
   const m = MODULOS[modulo] || MODULOS.todos;
   let base =
@@ -78,6 +83,10 @@ function systemPrompt(modulo, contexto) {
     `- Si no sabés algo con certeza, lo decís; no inventás datos legales ni impositivos.\n` +
     `- Cuando detectes interés real, invitá a dejar nombre y contacto para que un asesor siga la conversación.\n`;
 
+  if (extra && String(extra).trim()) {
+    base += `\nINSTRUCCIONES DEL CANAL (tienen prioridad sobre las reglas anteriores):\n${extra}\n`;
+  }
+
   if (contexto && contexto.trim()) {
     base +=
       `\nDOCUMENTACIÓN DE LA EMPRESA (usá esto como fuente principal cuando aplique; ` +
@@ -86,17 +95,17 @@ function systemPrompt(modulo, contexto) {
   return base;
 }
 
-async function chat({ modulo = 'todos', message, history = [] }) {
+async function chat({ modulo = 'todos', message, history = [], extra = '', maxTokens = 900 }) {
   // Recuperar fragmentos relevantes de los documentos cargados
   let contexto = '';
   try {
-    contexto = rag.retrieve(message, modulo, 4);
+    contexto = rag.retrieve(message, MODULOS[modulo] && modulo !== 'martoken' ? modulo : 'todos', 4);
   } catch (e) {
     contexto = '';
   }
 
   const msgs = [
-    { role: 'system', content: systemPrompt(modulo, contexto) },
+    { role: 'system', content: systemPrompt(modulo, contexto, extra) },
     ...history.slice(-8).map((h) => ({
       role: h.role === 'user' ? 'user' : 'assistant',
       content: String(h.content || '').slice(0, 4000)
@@ -108,7 +117,7 @@ async function chat({ modulo = 'todos', message, history = [] }) {
     model: MODEL,
     messages: msgs,
     temperature: 0.4,
-    max_tokens: 900
+    max_tokens: maxTokens
   });
 
   if (!res.ok) {

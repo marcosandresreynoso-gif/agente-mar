@@ -17,7 +17,8 @@ const { notifyEmail } = require('./src/notify');
 initDb();
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+// Guardamos el cuerpo crudo para validar la firma de los webhooks de Meta
+app.use(express.json({ limit: '2mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -187,6 +188,98 @@ app.delete('/api/admin/documentos/:id', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+/* ---------------------- WHATSAPP M-AR (panel /whatsapp) ---------------------- */
+const { normalizarTelefono } = require('./src/telefono');
+
+app.get('/api/admin/wa/resumen', requireAdmin, (req, res) => res.json(whatsapp.resumen()));
+
+app.get('/api/admin/wa/contactos', requireAdmin, (req, res) => {
+  res.json(whatsapp.listarContactos({ filtro: req.query.filtro || '', q: req.query.q || '' }));
+});
+
+app.get('/api/admin/wa/conversacion/:tel', requireAdmin, (req, res) => {
+  const c = whatsapp.conversacion(req.params.tel);
+  if (!c) return res.status(404).json({ error: 'Contacto no encontrado.' });
+  res.json(c);
+});
+
+// Responder a mano desde el panel (solo con la ventana de 24 hs abierta)
+app.post('/api/admin/wa/enviar', requireAdmin, async (req, res) => {
+  const { telefono, texto } = req.body || {};
+  const c = whatsapp.getContacto(telefono);
+  if (!c) return res.status(404).json({ error: 'Contacto no encontrado.' });
+  if (!texto || !String(texto).trim()) return res.status(400).json({ error: 'Mensaje vacío.' });
+  if (!whatsapp.ventanaAbierta(c)) {
+    return res.status(409).json({ error: 'Pasaron más de 24 hs desde su último mensaje. Solo podés escribirle con una plantilla aprobada.' });
+  }
+  const r = await whatsapp.enviarTexto(telefono, texto, 'marcos');
+  if (!r.ok) return res.status(502).json({ error: r.error });
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/wa/contacto/:tel', requireAdmin, (req, res) => {
+  const { estado, bot_activo, notas, reanudar } = req.body || {};
+  const campos = {};
+  if (estado) campos.estado = estado;
+  if (bot_activo !== undefined) campos.bot_activo = bot_activo ? 1 : 0;
+  if (notas !== undefined) campos.notas = notas;
+  if (reanudar) campos.pausa_hasta = null;
+  whatsapp.setContacto(req.params.tel, campos);
+  res.json({ ok: true });
+});
+
+// Alta manual o pegado de una lista (CSV / una empresa por línea)
+app.post('/api/admin/wa/importar', requireAdmin, (req, res) => {
+  const { texto, items, fuente } = req.body || {};
+  let lista = Array.isArray(items) ? items : [];
+  if (texto) {
+    for (const linea of String(texto).split(/\r?\n/)) {
+      if (!linea.trim()) continue;
+      const partes = linea.split(/[;\t,|]/).map((s) => s.trim());
+      // Buscamos la columna que parece teléfono; el resto es nombre / rubro
+      const idx = partes.findIndex((p) => normalizarTelefono(p));
+      if (idx === -1) { lista.push({ telefono: null }); continue; }
+      const resto = partes.filter((_, i) => i !== idx && partes[i]);
+      lista.push({ telefono: partes[idx], nombre: resto[0] || null, rubro: resto[1] || null });
+    }
+  }
+  if (!lista.length) return res.status(400).json({ error: 'No hay contactos para importar.' });
+  res.json({ ok: true, ...whatsapp.importarContactos(lista, fuente || 'manual') });
+});
+
+app.get('/api/admin/wa/plantillas', requireAdmin, async (req, res) => {
+  try {
+    res.json(await whatsapp.listarPlantillas(req.query.forzar === '1'));
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/wa/campania', requireAdmin, (req, res) => {
+  try {
+    const { telefonos, plantilla, forzar } = req.body || {};
+    if (!Array.isArray(telefonos) || !telefonos.length) return res.status(400).json({ error: 'Elegí al menos un contacto.' });
+    res.json({ ok: true, ...whatsapp.iniciarCampania({ telefonos, plantilla, forzar: !!forzar }) });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.get('/api/admin/wa/campania', requireAdmin, (req, res) => res.json(whatsapp.estadoCampania()));
+
+app.post('/api/admin/wa/config', requireAdmin, (req, res) => {
+  const { bot_activo, instrucciones, limite_diario } = req.body || {};
+  const c = {};
+  if (bot_activo !== undefined) c.wa_bot_activo = bot_activo ? '1' : '0';
+  if (instrucciones !== undefined) c.wa_instrucciones = String(instrucciones).slice(0, 4000);
+  if (limite_diario !== undefined) {
+    const n = Math.min(Math.max(parseInt(limite_diario, 10) || 30, 1), 1000);
+    c.wa_limite_diario = String(n);
+  }
+  setConfig(c);
+  res.json({ ok: true });
+});
+
 app.get('/api/admin/config', requireAdmin, (req, res) => res.json(getConfig()));
 app.post('/api/admin/config', requireAdmin, (req, res) => {
   setConfig(req.body || {});
@@ -280,6 +373,13 @@ app.post('/api/leads/import', async (req, res) => {
     });
     tx();
 
+    // Además, las empresas con teléfono pasan a la lista de contactos de WhatsApp M-AR
+    // (solo las de MARTOKEN; las de otras campañas, como Marvil, quedan afuera)
+    let wa = null;
+    if (via === 'whatsapp' && camp === 'martoken') {
+      try { wa = whatsapp.importarContactos(empresas, 'buscador', 'contactado'); } catch (e) { wa = null; }
+    }
+
     // Un solo aviso por lote
     if (guardados > 0) {
       notifyEmail(
@@ -296,7 +396,7 @@ app.post('/api/leads/import', async (req, res) => {
       ).catch(() => {});
     }
 
-    res.json({ ok: true, guardados, repetidos });
+    res.json({ ok: true, guardados, repetidos, whatsapp: wa });
   } catch (e) {
     console.error('[/api/leads/import] ERROR:', e && e.stack ? e.stack : e);
     res.status(500).json({ error: e.message });

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhatsApp M-AR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    :root { --wa: #25d366; --wa-soft: rgba(37, 211, 102, 0.12); --gold: #b8923f; --err: #ef6b6b; }
+    .tabs { display: flex; gap: 6px; overflow-x: auto; padding: 14px 0; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+    .tab { font-family: var(--mono); font-size: 13px; padding: 8px 14px; border-radius: 9px; cursor: pointer; color: var(--muted); border: 1px solid transparent; white-space: nowrap; }
+    .tab.active { color: var(--text); background: var(--wa-soft); border-color: var(--wa); }
+    .tab .n { background: var(--wa); color: #06210f; border-radius: 99px; padding: 0 6px; margin-left: 6px; font-weight: 700; font-size: 11px; }
+    .pane { display: none; } .pane.active { display: block; }
+    .btn { background: var(--wa); color: #06210f; border: none; border-radius: 9px; padding: 9px 15px; font-weight: 700; cursor: pointer; font-size: 13px; }
+    .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); font-weight: 600; }
+    .btn.small { padding: 5px 10px; font-size: 12px; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+    select.mini, input.mini, textarea.mini { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 8px 10px; font-size: 13px; font-family: var(--sans); }
+    textarea.mini { width: 100%; resize: vertical; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+    .card h3 { margin: 0 0 10px; font-size: 15px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .badge { font-family: var(--mono); font-size: 10.5px; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+    .badge.anuncio { color: var(--gold); border-color: var(--gold); }
+    .badge.buscador { color: var(--accent); border-color: var(--accent); }
+    .badge.ok { color: var(--wa); border-color: var(--wa); }
+    .badge.warn { color: var(--warn); border-color: var(--warn); }
+    .badge.err { color: var(--err); border-color: var(--err); }
+    .login-wrap { max-width: 360px; margin: 14vh auto; padding: 0 16px; }
+    .empty { color: var(--muted); padding: 30px; text-align: center; font-size: 14px; }
+
+    /* Bandeja */
+    .inbox { display: grid; grid-template-columns: 320px 1fr; gap: 14px; height: calc(100vh - 170px); min-height: 420px; }
+    .list { overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+    .item { padding: 12px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+    .item:hover, .item.sel { background: var(--panel-2); }
+    .item .top { display: flex; gap: 6px; align-items: center; }
+    .item .name { font-weight: 600; font-size: 14px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .item .prev { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 3px; }
+    .item .unread { background: var(--wa); color: #06210f; border-radius: 99px; font-size: 11px; font-weight: 700; padding: 0 7px; }
+    .thread { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+    .thead { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .thead .who { flex: 1; min-width: 140px; }
+    .thead .who b { display: block; font-size: 15px; }
+    .msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .b { max-width: 78%; padding: 8px 11px; border-radius: 11px; font-size: 14px; white-space: pre-wrap; word-wrap: break-word; border: 1px solid var(--line); background: var(--panel-2); }
+    .b.out { align-self: flex-end; background: #133b26; border-color: #1f5c3a; }
+    .b.fail { border-color: var(--err); }
+    .b .meta { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 4px; text-align: right; }
+    .compose { border-top: 1px solid var(--line); padding: 10px; display: flex; gap: 8px; }
+    .compose textarea { flex: 1; min-height: 42px; max-height: 140px; }
+    .aviso { padding: 10px 14px; font-size: 13px; background: rgba(224,179,65,.08); color: var(--warn); border-top: 1px solid var(--line); }
+    .back { display: none; }
+
+    /* Contactos */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-family: var(--mono); font-size: 10.5px; color: var(--muted); text-transform: uppercase; }
+    .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+
+    .check { display: flex; gap: 8px; align-items: center; padding: 5px 0; font-size: 14px; }
+    .preview { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; white-space: pre-wrap; font-size: 13.5px; margin: 10px 0; }
+    .progress { height: 8px; background: var(--panel-2); border-radius: 9px; overflow: hidden; margin: 10px 0; }
+    .progress div { height: 100%; background: var(--wa); width: 0; transition: width .4s; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+    .kpi .k { font-family: var(--mono); font-size: 10.5px; color: var(--muted); text-transform: uppercase; }
+    .kpi .v { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    code { font-family: var(--mono); font-size: 12px; background: var(--panel-2); padding: 2px 6px; border-radius: 5px; word-break: break-all; }
+
+    @media (max-width: 760px) {
+      .inbox { grid-template-columns: 1fr; height: auto; }
+      .inbox.open .list { display: none; }
+      .inbox:not(.open) .thread { display: none; }
+      .thread { height: calc(100vh - 150px); }
+      .back { display: inline-block; }
+      .b { max-width: 90%; }
+      .hide-m { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="login">
+    <div class="login-wrap">
+      <div class="logo" style="margin: 0 auto 16px;">WA</div>
+      <h2 style="text-align:center; margin:0 0 18px;">WhatsApp M-AR</h2>
+      <div class="field"><label>Contraseña del panel</label><input id="pass" type="password" /></div>
+      <div id="loginMsg"></div>
+      <button class="btn" style="width:100%; margin-top:8px;" id="loginBtn">Entrar</button>
+    </div>
+  </div>
+
+  <div id="app" style="display:none;">
+    <header class="bar">
+      <div class="bar-inner" style="max-width:1180px;">
+        <div class="logo">WA</div>
+        <div><h1>WhatsApp M-AR</h1><div class="sub">MARTOKEN · bot, bandeja y campañas</div></div>
+        <div class="status"><span class="dot" id="botDot"></span><span id="botTxt">Bot</span>&nbsp;·&nbsp;<a href="/admin">Panel</a>&nbsp;·&nbsp;<a href="#" id="logout">Salir</a></div>
+      </div>
+    </header>
+
+    <main class="wrap-wide" style="max-width:1180px;">
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-t="bandeja">Bandeja<span class="n" id="nNoLeidos" style="display:none"></span></div>
+        <div class="tab" data-t="contactos">Contactos</div>
+        <div class="tab" data-t="campania">Campaña</div>
+        <div class="tab" data-t="ajustes">Ajustes</div>
+      </div>
+
+      <!-- BANDEJA -->
+      <div class="pane active" data-pane="bandeja">
+        <div class="inbox" id="inbox">
+          <div class="list" id="convList"><div class="empty">Cargando…</div></div>
+          <div class="thread" id="thread"><div class="empty" style="margin:auto">Elegí una conversación</div></div>
+        </div>
+      </div>
+
+      <!-- CONTACTOS -->
+      <div class="pane" data-pane="contactos">
+        <div class="toolbar">
+          <input class="mini" id="q" placeholder="Buscar nombre, rubro, teléfono" style="flex:1; min-width:180px;" />
+          <select class="mini" id="filtro">
+            <option value="todos">Todos</option>
+            <option value="anuncio">Vinieron del anuncio</option>
+            <option value="buscador">Del buscador</option>
+            <option value="nuevo">Nuevos (sin contactar)</option>
+            <option value="contactado">Contactados</option>
+            <option value="respondio">Respondieron</option>
+            <option value="interesado">Interesados</option>
+            <option value="cliente">Clientes</option>
+            <option value="descartado">Descartados</option>
+            <option value="baja">Pidieron la baja</option>
+          </select>
+        </div>
+        <div class="toolbar">
+          <button class="btn" id="aCampania" disabled>Mandar plantilla a seleccionados (<span id="nSel">0</span>)</button>
+          <button class="btn ghost small" id="selNuevos">Seleccionar nuevos</button>
+          <button class="btn ghost small" id="selNada">Quitar selección</button>
+        </div>
+        <div class="tablewrap" id="contactosTable"></div>
+
+        <div class="card" style="margin-top:16px;">
+          <h3>Agregar contactos a mano</h3>
+          <p class="muted" style="margin-top:0">Una empresa por línea: <code>Nombre; teléfono; rubro</code>. Los números se pasan solos al formato de WhatsApp. Lo que mandás desde el buscador (campaña MARTOKEN) entra solo.</p>
+          <textarea class="mini" id="importTxt" rows="4" placeholder="Ferretería López; 02388 15 412345; ferretería"></textarea>
+          <div class="toolbar" style="margin-top:8px;"><button class="btn ghost" id="importBtn">Agregar</button><span class="muted" id="importMsg"></span></div>
+        </div>
+      </div>
+
+      <!-- CAMPAÑA -->
+      <div class="pane" data-pane="campania">
+        <div class="kpis" id="campKpis"></div>
+        <div class="card">
+          <h3>1. Plantilla</h3>
+          <div class="toolbar">
+            <select class="mini" id="tplSel" style="flex:1; min-width:200px;"><option value="">Cargando plantillas…</option></select>
+            <button class="btn ghost small" id="tplReload">Actualizar</button>
+          </div>
+          <div id="tplInfo" class="muted"></div>
+          <div id="tplVars"></div>
+          <div class="preview" id="tplPreview" style="display:none"></div>
+        </div>
+        <div class="card">
+          <h3>2. Destinatarios</h3>
+          <div id="destInfo" class="muted">Elegí contactos en la pestaña Contactos.</div>
+          <label class="check"><input type="checkbox" id="forzar" /> Incluir a quienes ya recibieron una plantilla en los últimos 30 días</label>
+        </div>
+        <div class="card">
+          <h3>3. Enviar</h3>
+          <p class="muted" style="margin-top:0">Cada plantilla de marketing tiene costo en Meta. Se manda de a una, con pausas, y nunca más del tope diario. Si alguien responde, el bot sigue la charla.</p>
+          <button class="btn" id="enviarCamp" disabled>Enviar campaña</button>
+          <div id="campMsg" class="muted" style="margin-top:10px;"></div>
+          <div class="progress" id="campBar" style="display:none"><div></div></div>
+          <div id="campDetalle"></div>
+        </div>
+      </div>
+
+      <!-- AJUSTES -->
+      <div class="pane" data-pane="ajustes">
+        <div class="card">
+          <h3>Conexión con Meta</h3>
+          <div id="checklist"></div>
+          <p class="muted">URL del webhook para cargar en Meta: <code id="hookUrl"></code></p>
+        </div>
+        <div class="card">
+          <h3>Bot</h3>
+          <label class="check"><input type="checkbox" id="botActivo" /> El bot responde automáticamente</label>
+          <p class="muted" style="margin:4px 0 12px">Si respondés vos desde el celular, el bot se calla 12 hs con esa persona. Si alguien pide hablar con una persona, el bot se pausa con ese contacto y te llega un mail.</p>
+          <label class="muted">Instrucciones del bot de WhatsApp</label>
+          <textarea class="mini" id="instr" rows="10"></textarea>
+          <div class="toolbar" style="margin-top:12px;">
+            <label class="muted">Tope de plantillas por día</label>
+            <input class="mini" id="limite" type="number" min="1" max="1000" style="width:90px" />
+            <button class="btn" id="guardarAj">Guardar</button>
+            <span class="muted" id="ajMsg"></span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="wa-panel.js"></script>
+</body>
+</html>

@@ -96,3 +96,23 @@ agente-mar/
 │   └── whatsapp.js    ← integración WhatsApp
 └── public/            ← chat (index) y panel (admin)
 ```
+
+---
+
+## WhatsApp M-AR (panel `/whatsapp`)
+
+Bot de MARTOKEN para WhatsApp + bandeja + campañas con plantillas. Funciona con el número de la app WhatsApp Business del celular en **modo coexistencia**: seguís usando la app y el bot atiende en paralelo.
+
+**Qué hace**
+- Responde solo a quien escribe desde los anuncios de Facebook/Instagram (detecta el anuncio que tocó) y lo guarda como lead con aviso por mail.
+- Si respondés vos desde el celular, el bot se calla 12 hs con esa persona.
+- Si alguien pide hablar con una persona, el bot se pausa y te llega un mail.
+- Si alguien escribe "BAJA", queda excluido de todo envío.
+- Las empresas que mandás desde el buscador (campaña MARTOKEN, canal WhatsApp) entran solas a **Contactos**.
+- **Campaña**: elegís contactos y una plantilla aprobada; se envía de a una con pausas y un tope diario (por defecto 30). No repite plantilla a la misma persona en 30 días.
+
+**Variables en Render** (Environment): `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_WABA_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`.
+
+**Webhook en Meta**: URL `https://agente-mar.onrender.com/webhook/whatsapp`, token de verificación = el mismo `WHATSAPP_VERIFY_TOKEN`. Suscribir los campos `messages` y `smb_message_echoes`.
+
+**Importante**: sin disco persistente (plan Starter + disk), las conversaciones se borran en cada deploy.
