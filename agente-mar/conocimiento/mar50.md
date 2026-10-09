@@ -13,7 +13,7 @@ Está en etapa de PREINSCRIPCIÓN (lista de interés). Todavía no se están ven
 la persona se anota, elige su localidad y la cantidad de tokens que le interesaría, y cuando se abra la
 emisión se le avisa primero.
 
-Link de preinscripción: https://martoken-mar50.netlify.app
+Link de preinscripción (sección MAR-50 del sitio oficial): https://www.martoken.com.ar/#mar50
 
 ## A QUIÉN APUNTA
 
@@ -36,7 +36,7 @@ Sirve a dos perfiles:
 
 ## DATOS
 
-- Viviendas: 50.
+- Viviendas: 50, de 56 m² cada una.
 - Precio por token: USD 100 (se puede entrar desde 1 token).
 - Blockchain: Polygon. Respaldo legal: fideicomiso inmobiliario.
 - El terreno forma parte del proyecto y se compra con lo recaudado.
@@ -49,7 +49,7 @@ Sirve a dos perfiles:
   y que preinscribirse le asegura recibirlos primero.
 - No prometer rentabilidad ni garantizar que la persona gane el sorteo.
 - No decir que ya se pueden comprar tokens de MAR-50.
-- Siempre invitar a preinscribirse en https://martoken-mar50.netlify.app
+- Siempre invitar a preinscribirse en https://www.martoken.com.ar/#mar50
 
 ## MAR-01 vs MAR-50
 
