@@ -191,6 +191,19 @@ app.delete('/api/admin/documentos/:id', requireAdmin, (req, res) => {
 /* ---------------------- WHATSAPP M-AR (panel /whatsapp) ---------------------- */
 const { normalizarTelefono } = require('./src/telefono');
 
+app.post('/api/admin/wa/buscar', requireAdmin, async (req, res) => {
+  try {
+    const fuente = (req.body || {}).fuente === 'maps' ? 'maps' : 'pa';
+    const lista = fuente === 'maps'
+      ? await require('./src/maps').buscarEmpresas(req.body || {})
+      : await require('./src/paginas').buscarPaginasAmarillas(req.body || {});
+    // Marcar las que ya están en contactos
+    res.json(lista.map((e) => ({ ...e, ya_cargada: !!(e.whatsapp && whatsapp.getContacto(e.whatsapp)) })));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 app.get('/api/admin/wa/diagnostico', requireAdmin, async (req, res) => {
   try { res.json(await whatsapp.diagnostico()); } catch (e) { res.status(500).json({ error: e.message }); }
 });

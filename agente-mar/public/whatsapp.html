@@ -106,6 +106,7 @@
     <main class="wrap-wide" style="max-width:1180px;">
       <div class="tabs" id="tabs">
         <div class="tab active" data-t="bandeja">Bandeja<span class="n" id="nNoLeidos" style="display:none"></span></div>
+        <div class="tab" data-t="buscar">Buscar empresas</div>
         <div class="tab" data-t="contactos">Contactos</div>
         <div class="tab" data-t="campania">Campaña</div>
         <div class="tab" data-t="ajustes">Ajustes</div>
@@ -117,6 +118,27 @@
           <div class="list" id="convList"><div class="empty">Cargando…</div></div>
           <div class="thread" id="thread"><div class="empty" style="margin:auto">Elegí una conversación</div></div>
         </div>
+      </div>
+
+      <!-- BUSCAR EMPRESAS -->
+      <div class="pane" data-pane="buscar">
+        <div class="card">
+          <h3>Buscar empresas</h3>
+          <div class="toolbar">
+            <input class="mini" id="bRubro" placeholder="Rubro (ej: ferretería, corralón, contador)" style="flex:2; min-width:180px;" />
+            <input class="mini" id="bLocalidad" placeholder="Localidad (ej: General Villegas)" style="flex:2; min-width:160px;" />
+            <select class="mini" id="bFuente"><option value="pa">Páginas Amarillas (gratis)</option><option value="maps">Google Maps (pago)</option></select>
+            <select class="mini" id="bCantidad"><option value="30">30</option><option value="60">60</option></select>
+            <button class="btn" id="bBtn">Buscar</button>
+          </div>
+          <label class="check"><input type="checkbox" id="bSoloCel" checked /> Mostrar solo celulares (los fijos casi nunca tienen WhatsApp)</label>
+          <div class="muted" id="bMsg"></div>
+        </div>
+        <div class="toolbar">
+          <button class="btn" id="bAgregar" disabled>Agregar seleccionadas a Contactos (<span id="bN">0</span>)</button>
+          <button class="btn ghost small" id="bTodas">Seleccionar todas</button>
+        </div>
+        <div class="tablewrap" id="bTabla"></div>
       </div>
 
       <!-- CONTACTOS -->

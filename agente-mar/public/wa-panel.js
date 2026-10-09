@@ -56,6 +56,7 @@ function abrirTab(id) {
   document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === id));
   if (id === 'bandeja') cargarBandeja();
   if (id === 'contactos') cargarContactos();
+  if (id === 'buscar') pintarBusqueda();
   if (id === 'campania') cargarCampania();
   if (id === 'ajustes') cargarAjustes();
 }
@@ -146,6 +147,53 @@ async function abrirConversacion(tel, scroll = true) {
   }
   cargarResumen();
 }
+
+/* ---------------- Buscar empresas (Google Maps) ---------------- */
+let resultados = [];
+let bSel = new Set();
+function visibles() { return resultados.filter((e) => !$('bSoloCel').checked || !!e.whatsapp); }
+function pintarBusqueda() {
+  const lista = visibles();
+  $('bN').textContent = bSel.size;
+  $('bAgregar').disabled = bSel.size === 0;
+  if (!resultados.length) { $('bTabla').innerHTML = '<div class="empty">Buscá un rubro y una localidad.</div>'; return; }
+  if (!lista.length) { $('bTabla').innerHTML = '<div class="empty">No hay celulares en estos resultados. Destildá "solo celulares" para ver todo.</div>'; return; }
+  $('bTabla').innerHTML = `<table><thead><tr><th></th><th>Empresa</th><th>Teléfono</th><th class="hide-m">Dirección</th></tr></thead><tbody>${lista.map((e) => {
+    const i = resultados.indexOf(e);
+    const ok = !!e.whatsapp && !e.ya_cargada;
+    return `<tr><td><input type="checkbox" class="bsel" data-i="${i}" ${bSel.has(i) ? 'checked' : ''} ${ok ? '' : 'disabled'} /></td>
+      <td>${esc(e.nombre)}${e.web ? ` <a href="${esc(e.web)}" target="_blank">↗</a>` : ''}</td>
+      <td style="white-space:nowrap">${esc(e.telefono_vista || '—')} ${e.tipo_telefono ? `<span class="badge ${e.whatsapp ? 'ok' : ''}">${esc(e.tipo_telefono)}</span>` : ''}${e.ya_cargada ? ' <span class="badge">ya cargada</span>' : ''}</td>
+      <td class="hide-m muted">${esc(e.direccion)}</td></tr>`;
+  }).join('')}</tbody></table>`;
+  document.querySelectorAll('.bsel').forEach((el) => (el.onchange = () => { const i = +el.dataset.i; el.checked ? bSel.add(i) : bSel.delete(i); $('bN').textContent = bSel.size; $('bAgregar').disabled = bSel.size === 0; }));
+}
+$('bSoloCel').onchange = pintarBusqueda;
+$('bBtn').onclick = async () => {
+  const rubro = $('bRubro').value.trim(), localidad = $('bLocalidad').value.trim();
+  if (!rubro || !localidad) { $('bMsg').textContent = 'Completá rubro y localidad.'; return; }
+  $('bBtn').disabled = true; $('bMsg').textContent = 'Buscando… (puede tardar hasta 30 segundos)';
+  try {
+    const nuevos = await post('/api/admin/wa/buscar', { rubro, localidad, cantidad: $('bCantidad').value, fuente: $('bFuente').value });
+    const vistos = new Set(resultados.map((e) => e.nombre + e.telefono_vista));
+    for (const e of nuevos) if (!vistos.has(e.nombre + e.telefono_vista)) resultados.push(e);
+    const cel = nuevos.filter((e) => !!e.whatsapp).length;
+    $('bMsg').textContent = `Encontradas ${nuevos.length} · con celular: ${cel}. Podés hacer otra búsqueda y se suman a la lista.`;
+  } catch (e) { $('bMsg').textContent = e.message; }
+  $('bBtn').disabled = false;
+  pintarBusqueda();
+};
+$('bTodas').onclick = () => { visibles().forEach((e) => { const i = resultados.indexOf(e); if (e.whatsapp && !e.ya_cargada) bSel.add(i); }); pintarBusqueda(); };
+$('bAgregar').onclick = async () => {
+  const items = [...bSel].map((i) => resultados[i]);
+  try {
+    const r = await post('/api/admin/wa/importar', { items, fuente: 'buscador' });
+    $('bMsg').textContent = `Agregadas a Contactos: ${r.nuevos} · ya estaban: ${r.existentes}. Andá a Contactos → "Seleccionar nuevos" → Campaña.`;
+    items.forEach((e) => (e.ya_cargada = true));
+    bSel.clear();
+    pintarBusqueda();
+  } catch (e) { $('bMsg').textContent = e.message; }
+};
 
 /* ---------------- Contactos ---------------- */
 let qTimer = null;
