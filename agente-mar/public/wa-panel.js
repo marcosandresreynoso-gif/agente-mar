@@ -169,12 +169,34 @@ function pintarBusqueda() {
   document.querySelectorAll('.bsel').forEach((el) => (el.onchange = () => { const i = +el.dataset.i; el.checked ? bSel.add(i) : bSel.delete(i); $('bN').textContent = bSel.size; $('bAgregar').disabled = bSel.size === 0; }));
 }
 $('bSoloCel').onchange = pintarBusqueda;
+// La consulta a OpenStreetMap sale desde el navegador (con la conexión del usuario)
+const OVERPASS_NAV = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+async function buscarOSMNavegador(rubro, localidad) {
+  $('bMsg').textContent = 'Ubicando la localidad en el mapa…';
+  const g = await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ar&accept-language=es&q=' + encodeURIComponent(localidad + ', Argentina'))).json();
+  if (!g.length) throw new Error(`No encontré "${localidad}" en el mapa. Probá con "Ciudad, Provincia".`);
+  const { query } = await post('/api/admin/wa/osm/consulta', { rubro, lat: g[0].lat, lon: g[0].lon });
+  const errores = [];
+  for (const url of OVERPASS_NAV) {
+    try {
+      $('bMsg').textContent = 'Buscando comercios… (' + new URL(url).host + ')';
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(query) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      return await post('/api/admin/wa/osm/procesar', { elements: d.elements || [], rubro, localidad });
+    } catch (e) { errores.push(new URL(url).host + ': ' + e.message); }
+  }
+  throw new Error('OpenStreetMap no respondió: ' + errores.join(' | ') + '. Esperá un minuto y probá de nuevo.');
+}
+
 $('bBtn').onclick = async () => {
   const rubro = $('bRubro').value.trim(), localidad = $('bLocalidad').value.trim();
   if (!rubro || !localidad) { $('bMsg').textContent = 'Completá rubro y localidad.'; return; }
   $('bBtn').disabled = true; $('bMsg').textContent = 'Buscando… (puede tardar hasta 30 segundos)';
   try {
-    const nuevos = await post('/api/admin/wa/buscar', { rubro, localidad, cantidad: $('bCantidad').value, fuente: $('bFuente').value });
+    const nuevos = $('bFuente').value === 'osm'
+      ? await buscarOSMNavegador(rubro, localidad)
+      : await post('/api/admin/wa/buscar', { rubro, localidad, cantidad: $('bCantidad').value, fuente: $('bFuente').value });
     const vistos = new Set(resultados.map((e) => e.nombre + e.telefono_vista));
     for (const e of nuevos) if (!vistos.has(e.nombre + e.telefono_vista)) resultados.push(e);
     const cel = nuevos.filter((e) => !!e.whatsapp).length;

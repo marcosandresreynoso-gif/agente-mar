@@ -18,7 +18,7 @@ initDb();
 
 const app = express();
 // Guardamos el cuerpo crudo para validar la firma de los webhooks de Meta
-app.use(express.json({ limit: '2mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
+app.use(express.json({ limit: '10mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -190,6 +190,18 @@ app.delete('/api/admin/documentos/:id', requireAdmin, (req, res) => {
 
 /* ---------------------- WHATSAPP M-AR (panel /whatsapp) ---------------------- */
 const { normalizarTelefono } = require('./src/telefono');
+
+// OpenStreetMap desde el navegador del usuario (los servidores de OSM bloquean a Render)
+app.post('/api/admin/wa/osm/consulta', requireAdmin, (req, res) => {
+  const { rubro, lat, lon } = req.body || {};
+  if (!rubro || lat === undefined || lon === undefined) return res.status(400).json({ error: 'Faltan datos.' });
+  res.json({ query: require('./src/osm').armarConsulta({ rubro, lat, lon }) });
+});
+app.post('/api/admin/wa/osm/procesar', requireAdmin, (req, res) => {
+  const { elements, rubro, localidad } = req.body || {};
+  const lista = require('./src/osm').procesarElementos(elements || [], { rubro, localidad });
+  res.json(lista.map((e) => ({ ...e, ya_cargada: !!(e.whatsapp && whatsapp.getContacto(e.whatsapp)) })));
+});
 
 app.post('/api/admin/wa/buscar', requireAdmin, async (req, res) => {
   try {
