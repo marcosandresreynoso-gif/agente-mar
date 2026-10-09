@@ -191,6 +191,10 @@ app.delete('/api/admin/documentos/:id', requireAdmin, (req, res) => {
 /* ---------------------- WHATSAPP M-AR (panel /whatsapp) ---------------------- */
 const { normalizarTelefono } = require('./src/telefono');
 
+app.get('/api/admin/wa/diagnostico', requireAdmin, async (req, res) => {
+  try { res.json(await whatsapp.diagnostico()); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/admin/wa/resumen', requireAdmin, (req, res) => res.json(whatsapp.resumen()));
 
 app.get('/api/admin/wa/contactos', requireAdmin, (req, res) => {

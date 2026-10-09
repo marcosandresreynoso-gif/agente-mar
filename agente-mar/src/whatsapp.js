@@ -484,9 +484,11 @@ function procesarEstado(st) {
 }
 
 async function receive(req, res) {
-  if (!firmaValida(req)) return res.sendStatus(401);
+  if (!firmaValida(req)) { console.warn('[WA] webhook con firma inválida (revisá WHATSAPP_APP_SECRET)'); return res.sendStatus(401); }
   res.sendStatus(200); // responder rápido a Meta
   try {
+    const v0 = req.body?.entry?.[0]?.changes?.[0];
+    console.log(`[WA] webhook recibido: campo=${v0?.field || '-'} mensajes=${v0?.value?.messages?.length || 0} estados=${v0?.value?.statuses?.length || 0}`);
     for (const entry of req.body?.entry || []) {
       for (const change of entry.changes || []) {
         const v = change.value || {};
@@ -502,6 +504,44 @@ async function receive(req, res) {
   } catch (e) {
     console.error('[WA] webhook:', e.message);
   }
+}
+
+// Diagnóstico: revisa token, número y suscripción de la cuenta a la app (y la crea si falta)
+async function diagnostico() {
+  const { token, phoneId, wabaId } = credenciales();
+  const out = { pasos: [] };
+  const paso = (nombre, ok, detalle) => out.pasos.push({ nombre, ok, detalle });
+  if (!token || !phoneId || !wabaId) {
+    paso('Variables en Render', false, 'Falta WHATSAPP_TOKEN, WHATSAPP_PHONE_ID o WHATSAPP_WABA_ID');
+    return out;
+  }
+  paso('Variables en Render', true, 'Cargadas');
+  const get = async (path) => {
+    const r = await fetch(`${GRAPH()}/${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || d.error) throw new Error(d.error?.message || `Error ${r.status}`);
+    return d;
+  };
+  try {
+    const n = await get(`${phoneId}?fields=display_phone_number,verified_name,quality_rating`);
+    paso('Token y número', true, `${n.display_phone_number} (${n.verified_name || 'sin nombre'})`);
+  } catch (e) {
+    paso('Token y número', false, e.message + ' — si dice que el token venció, generá uno nuevo y actualizalo en Render');
+    return out;
+  }
+  try {
+    let subs = await get(`${wabaId}/subscribed_apps`);
+    if (!subs.data || !subs.data.length) {
+      await graphPost(`${wabaId}/subscribed_apps`, {});
+      subs = await get(`${wabaId}/subscribed_apps`);
+      paso('Cuenta suscripta a la app', !!(subs.data && subs.data.length), 'No estaba suscripta: la suscribí ahora ✅');
+    } else {
+      paso('Cuenta suscripta a la app', true, 'Ya estaba suscripta: ' + subs.data.map((a) => a.whatsapp_business_api_data?.name || a.name || 'app').join(', '));
+    }
+  } catch (e) {
+    paso('Cuenta suscripta a la app', false, e.message);
+  }
+  return out;
 }
 
 /* ============================ CONSULTAS PARA EL PANEL ============================ */
@@ -576,6 +616,7 @@ function importarContactos(items = [], fuente = 'buscador', estado = 'nuevo') {
 }
 
 module.exports = {
+  diagnostico,
   verify,
   receive,
   sendMessage,

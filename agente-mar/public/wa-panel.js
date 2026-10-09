@@ -324,6 +324,14 @@ $('guardarAj').onclick = async () => {
   } catch (e) { $('ajMsg').textContent = e.message; }
 };
 
+$('diagBtn').onclick = async () => {
+  $('diagOut').innerHTML = '<span class="muted">Revisando con Meta…</span>';
+  try {
+    const d = await api('/api/admin/wa/diagnostico');
+    $('diagOut').innerHTML = d.pasos.map((p) => `<div class="check">${p.ok ? '✅' : '❌'} <b>${esc(p.nombre)}</b>: ${esc(p.detalle)}</div>`).join('');
+  } catch (e) { $('diagOut').textContent = e.message; }
+};
+
 /* ---------------- Inicio ---------------- */
 function start() {
   $('login').style.display = 'none';
