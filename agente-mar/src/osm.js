@@ -4,7 +4,12 @@ const { normalizarTelefono } = require('./telefono');
 const { esCelular } = require('./paginas');
 
 const UA = 'agente-mar/1.0 (MARTOKEN; martokenoficial@gmail.com)';
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+const OVERPASS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter'
+];
 
 function sinTildes(t) {
   return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -56,21 +61,26 @@ async function ubicar(localidad) {
 }
 
 async function overpass(query) {
-  let ultimoError;
+  const errores = [];
   for (const base of OVERPASS) {
+    const host = new URL(base).host;
     try {
-      const r = await fetch(base, {
-        method: 'POST',
-        headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'data=' + encodeURIComponent(query)
-      });
-      if (!r.ok) throw new Error(`Overpass ${r.status}`);
-      return await r.json();
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 30000);
+      const r = await fetch(base + '?data=' + encodeURIComponent(query), {
+        headers: { 'User-Agent': UA, Accept: 'application/json' },
+        signal: ctrl.signal
+      }).finally(() => clearTimeout(t));
+      const txt = await r.text();
+      if (!r.ok) throw new Error(`HTTP ${r.status} ${txt.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 120)}`);
+      return JSON.parse(txt);
     } catch (e) {
-      ultimoError = e;
+      const msg = e.name === 'AbortError' ? 'tardó más de 30 s' : e.message;
+      console.error(`[OSM] ${host}: ${msg}`);
+      errores.push(`${host}: ${msg}`);
     }
   }
-  throw new Error('OpenStreetMap no respondió (' + (ultimoError?.message || 'error') + '). Probá de nuevo en un minuto.');
+  throw new Error('OpenStreetMap no respondió. Detalle: ' + errores.join(' | '));
 }
 
 async function buscarOSM({ rubro, localidad, cantidad = 60, radioKm = 8 }) {
