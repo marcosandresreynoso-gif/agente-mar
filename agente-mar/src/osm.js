@@ -83,21 +83,22 @@ async function overpass(query) {
   throw new Error('OpenStreetMap no respondió. Detalle: ' + errores.join(' | '));
 }
 
-function armarConsulta({ rubro, lat, lon, radioKm = 8 }) {
+function armarConsulta({ rubro, lat, lon, radioKm = 5 }) {
   const radio = Math.round(radioKm * 1000);
   const r0 = sinTildes(rubro);
   const etiquetas = (RUBROS.find(([re]) => re.test(r0)) || [null, []])[1];
   const area = `(around:${radio},${(+lat).toFixed(5)},${(+lon).toFixed(5)})`;
   const filtrosTag = etiquetas.map((t) => {
     const [k, v] = t.split('=');
-    return `nwr["${k}"="${v}"]${area};`;
+    return `nw["${k}"="${v}"]${area};`;
   });
   const palabra = r0.replace(/[^a-z0-9 ]/g, '').split(' ').filter((p) => p.length > 3)[0] || r0;
   const raiz = (palabra.length > 6 ? palabra.slice(0, palabra.length - 2) : palabra).replace(/[^a-z0-9]/g, '');
-  const filtrosNombre = raiz.length >= 4
-    ? ['shop', 'office', 'amenity', 'craft'].map((k) => `nwr["${k}"]["name"~"${raiz}",i]${area};`)
+  // Búsqueda por nombre solo si el rubro no está en la tabla (es la parte más pesada)
+  const filtrosNombre = !etiquetas.length && raiz.length >= 4
+    ? [`nw["shop"]["name"~"${raiz}",i]${area};`, `nw["office"]["name"~"${raiz}",i]${area};`]
     : [];
-  return `[out:json][timeout:25];(${filtrosTag.join('')}${filtrosNombre.join('')});out center tags 300;`;
+  return `[out:json][timeout:20];(${filtrosTag.join('')}${filtrosNombre.join('')});out center tags 300;`;
 }
 
 function procesarElementos(elements, { rubro, localidad, cantidad = 200 }) {

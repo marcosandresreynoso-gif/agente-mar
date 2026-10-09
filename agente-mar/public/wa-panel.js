@@ -170,13 +170,14 @@ function pintarBusqueda() {
 }
 $('bSoloCel').onchange = pintarBusqueda;
 // La consulta a OpenStreetMap sale desde el navegador (con la conexión del usuario)
-const OVERPASS_NAV = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+const OVERPASS_NAV = ['https://overpass-api.de/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
 async function buscarOSMNavegador(rubro, localidad) {
   $('bMsg').textContent = 'Ubicando la localidad en el mapa…';
   const g = await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ar&accept-language=es&q=' + encodeURIComponent(localidad + ', Argentina'))).json();
   if (!g.length) throw new Error(`No encontré "${localidad}" en el mapa. Probá con "Ciudad, Provincia".`);
   const { query } = await post('/api/admin/wa/osm/consulta', { rubro, lat: g[0].lat, lon: g[0].lon });
   const errores = [];
+  for (const intento of [1, 2, 3]) {
   for (const url of OVERPASS_NAV) {
     try {
       $('bMsg').textContent = 'Buscando comercios… (' + new URL(url).host + ')';
@@ -186,7 +187,9 @@ async function buscarOSMNavegador(rubro, localidad) {
       return await post('/api/admin/wa/osm/procesar', { elements: d.elements || [], rubro, localidad });
     } catch (e) { errores.push(new URL(url).host + ': ' + e.message); }
   }
-  throw new Error('OpenStreetMap no respondió: ' + errores.join(' | ') + '. Esperá un minuto y probá de nuevo.');
+  if (intento < 3) { $('bMsg').textContent = `OpenStreetMap está saturado, reintento ${intento + 1} de 3 en 5 segundos…`; await new Promise((ok) => setTimeout(ok, 5000)); }
+  }
+  throw new Error('OpenStreetMap está saturado ahora (' + errores.slice(-3).join(' | ') + '). Probá en un rato.');
 }
 
 $('bBtn').onclick = async () => {
