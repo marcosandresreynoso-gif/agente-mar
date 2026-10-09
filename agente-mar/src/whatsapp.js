@@ -368,7 +368,7 @@ function textoDeMensaje(msg) {
   }
 }
 
-const RE_BAJA = /^\s*(baja|stop|no me escriban|no me escribas|no quiero (recibir )?(m[aá]s )?mensajes)\s*[.!]*\s*$/i;
+const RE_BAJA = /^\s*(baja|stop|no me interesa|no me escriban|no me escribas|no quiero (recibir )?(m[aá]s )?mensajes)\s*[.!]*\s*$/i;
 const RE_HUMANO = /(hablar|comunicarme|charlar) con (una persona|alguien|marcos|un asesor|un humano)|\bhumano\b|\basesor\b/i;
 
 // Mensajes que se procesan en orden por contacto, para que no se pisen las respuestas
@@ -441,7 +441,7 @@ async function procesarEntrante(msg, perfil) {
   }
 
   // Pedido de baja
-  if (msg.type === 'text' && RE_BAJA.test(texto)) {
+  if (['text', 'button', 'interactive'].includes(msg.type) && RE_BAJA.test(texto)) {
     setContacto(tel, { estado: 'baja', bot_activo: 0 });
     await enviarTexto(tel, 'Listo, no te vamos a escribir más. Si algún día querés saber de MARTOKEN, escribinos acá. ¡Gracias!', 'bot');
     return;
