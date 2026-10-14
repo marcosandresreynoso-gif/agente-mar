@@ -10,7 +10,7 @@
 // pagar, firmar). Solo las PROPONEN y quedan pendientes hasta que Marcos las aprueba en el panel.
 
 const { db, getConfig, setConfig } = require('./db');
-const { complete } = require('./groq');
+const { complete, cantidadKeys } = require('./groq');
 const rag = require('./rag');
 
 const now = () => new Date().toISOString();
@@ -280,7 +280,7 @@ function promptAgente(id, consulta) {
   const foco = getFoco();
   let contexto = '';
   // La búsqueda en la documentación incluye el foco, así trae lo de MAR-50 (u otro proyecto) aunque el pedido no lo nombre
-  try { contexto = rag.retrieve(`${consulta} ${foco.slice(0, 300)}`, a.rag || 'todos', 5); } catch (e) { contexto = ''; }
+  try { contexto = rag.retrieve(`${consulta} ${foco.slice(0, 300)}`, a.rag || 'todos', 3); } catch (e) { contexto = ''; }
   const datos = a.datos ? datosDelSistema(a.datos) : '';
   let s = `Te llamás ${a.nombre} y sos ${a.puesto} en la oficina de MARTOKEN (Organización M-AR & Asociados, General Villegas). ` +
     `Tu jefe es Marcos Reynoso, fundador y fiduciario.\n${a.prompt}\n\n` +
@@ -303,7 +303,7 @@ async function chatConAgente({ agente, message, history = [] }) {
   if (!AGENTES[agente]) throw new Error('Ese agente no existe.');
   const hist = history.slice(-6).map((h) => `${h.role === 'user' ? 'Marcos' : AGENTES[agente].nombre}: ${String(h.content || '').slice(0, 1500)}`).join('\n');
   const user = (hist ? `Conversación hasta ahora:\n${hist}\n\n` : '') + `Marcos: ${String(message).slice(0, 4000)}`;
-  const out = await complete(promptAgente(agente, message), user, { maxTokens: 1200, temperature: 0.4 });
+  const out = await complete(promptAgente(agente, message), user, { maxTokens: 1000, temperature: 0.4, maxEsperaMs: 45000 });
   const { texto, acciones } = separarAcciones(out);
   // Las acciones que propone en el chat también quedan para aprobar
   const ins = db.prepare('INSERT INTO eq_acciones (created_at, mision_id, agente, descripcion) VALUES (?,?,?,?)');
@@ -323,7 +323,7 @@ async function planificar(pedido) {
     'Respondé SOLO un JSON con esta forma: {"resumen":"qué vas a hacer en 1 frase","tareas":[{"agente":"id","tarea":"instrucción concreta"}]}\n' +
     'Reglas: entre 1 y 4 tareas, solo los agentes necesarios, en orden lógico (los que dependen de otros van después). ' +
     'Usá exactamente los id de la lista.';
-  const raw = await complete(sys, pedido, { json: true, maxTokens: 700 });
+  const raw = await complete(sys, pedido, { json: true, maxTokens: 500, maxEsperaMs: 90000 });
   let plan;
   try { plan = JSON.parse(raw); } catch (e) { plan = null; }
   let tareas = (plan && Array.isArray(plan.tareas) ? plan.tareas : [])
@@ -354,10 +354,10 @@ async function ejecutarMision(misionId) {
       db.prepare('UPDATE eq_tareas SET estado = ?, started_at = ? WHERE id = ?').run('trabajando', now(), t.id);
       try {
         const previo = hechos.length
-          ? '\n\nLo que ya hicieron tus compañeros en esta misión:\n' + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 1800)}`).join('\n\n')
+          ? '\n\nLo que ya hicieron tus compañeros en esta misión:\n' + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 1000)}`).join('\n\n')
           : '';
         const user = `Pedido original de Marcos: ${m.pedido}\n\nTu tarea: ${t.tarea}${previo}`;
-        const out = await complete(promptAgente(t.agente, `${m.pedido} ${t.tarea}`), user, { maxTokens: 1400, temperature: 0.4 });
+        const out = await complete(promptAgente(t.agente, `${m.pedido} ${t.tarea}`), user, { maxTokens: 1100, temperature: 0.4, maxEsperaMs: 90000 });
         const { texto, acciones } = separarAcciones(out);
         for (const ac of acciones) insA.run(now(), misionId, t.agente, ac);
         db.prepare('UPDATE eq_tareas SET estado = ?, resultado = ?, finished_at = ? WHERE id = ?').run('lista', texto, now(), t.id);
@@ -373,8 +373,8 @@ async function ejecutarMision(misionId) {
       const sys = promptAgente('directora', m.pedido) +
         '\nAhora escribí el INFORME FINAL para Marcos: conclusión en 2-3 líneas, lo más importante de cada área, ' +
         'y próximos pasos numerados. Máximo 300 palabras. No repitas todo: sintetizá. No incluyas sección de acciones propuestas.';
-      const user = `Pedido: ${m.pedido}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 2500)}`).join('\n\n');
-      informe = separarAcciones(await complete(sys, user, { maxTokens: 900, temperature: 0.3 })).texto;
+      const user = `Pedido: ${m.pedido}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 1400)}`).join('\n\n');
+      informe = separarAcciones(await complete(sys, user, { maxTokens: 800, temperature: 0.3, maxEsperaMs: 90000 })).texto;
     } else if (hechos.length === 1) {
       informe = hechos[0].texto;
     } else {
@@ -418,7 +418,7 @@ function estadoOficina() {
      WHERE t.finished_at IS NOT NULL ORDER BY t.finished_at DESC LIMIT 15`
   ).all();
   const pendientes = db.prepare(`SELECT COUNT(*) n FROM eq_acciones WHERE estado = 'pendiente'`).get().n;
-  return { ocupados, actividad, acciones_pendientes: pendientes };
+  return { ocupados, actividad, acciones_pendientes: pendientes, groq_keys: cantidadKeys() };
 }
 
 function listarAcciones(estado = 'pendiente') {
