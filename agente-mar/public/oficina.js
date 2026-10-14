@@ -1,6 +1,8 @@
 // oficina.js — Oficina MARTOKEN (equipo de agentes)
 const $ = (id) => document.getElementById(id);
-let KEY = sessionStorage.getItem('mar_admin') || '';
+// En la app del celular la sesión queda guardada (si marcaste "Recordarme")
+const leer = (k) => { try { return localStorage.getItem(k) || sessionStorage.getItem(k) || ''; } catch (e) { return ''; } };
+let KEY = leer('mar_admin');
 let AGENTES = [];
 let porId = {};
 let agenteAbierto = null;
@@ -66,10 +68,12 @@ async function entrar() {
   try {
     const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: p }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Error');
-    KEY = p; sessionStorage.setItem('mar_admin', p); iniciar();
+    KEY = p;
+    try { sessionStorage.setItem('mar_admin', p); if ($('recordar').checked) localStorage.setItem('mar_admin', p); } catch (e) {}
+    iniciar();
   } catch (e) { $('loginMsg').textContent = e.message; }
 }
-function salir() { sessionStorage.removeItem('mar_admin'); KEY = ''; $('app').style.display = 'none'; $('login').style.display = 'block'; }
+function salir() { try { sessionStorage.removeItem('mar_admin'); localStorage.removeItem('mar_admin'); } catch (e) {} KEY = ''; $('app').style.display = 'none'; $('login').style.display = 'block'; }
 
 /* ---------- oficina ---------- */
 async function cargarOficina() {
@@ -260,3 +264,21 @@ $('chatTxt').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.prev
 setInterval(() => { if (KEY && !document.hidden) { cargarOficina().catch(() => {}); } }, 20000);
 
 if (KEY) iniciar(); else $('login').style.display = 'block';
+
+/* ---------- instalar como app ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw-oficina.js').catch(() => {}));
+}
+let pedidoInstalar = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); pedidoInstalar = e;
+  $('instalarApp').style.display = ''; $('sepInstalar').style.display = '';
+});
+$('instalarApp').onclick = async (e) => {
+  e.preventDefault();
+  if (!pedidoInstalar) return;
+  pedidoInstalar.prompt();
+  await pedidoInstalar.userChoice.catch(() => {});
+  pedidoInstalar = null; $('instalarApp').style.display = 'none'; $('sepInstalar').style.display = 'none';
+};
+window.addEventListener('appinstalled', () => { $('instalarApp').style.display = 'none'; $('sepInstalar').style.display = 'none'; });
