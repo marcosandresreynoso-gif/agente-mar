@@ -1,0 +1,236 @@
+// oficina.js — Oficina MARTOKEN (equipo de agentes)
+const $ = (id) => document.getElementById(id);
+let KEY = sessionStorage.getItem('mar_admin') || '';
+let AGENTES = [];
+let porId = {};
+let agenteAbierto = null;
+const chats = {};           // historial de chat por agente (solo en esta pestaña)
+let misionVista = null;     // id de la misión que se muestra
+let timerMision = null;
+
+const SALAS = [
+  { t: 'Dirección', ids: ['directora'] },
+  { t: 'Comercial', ids: ['captacion', 'prospeccion'] },
+  { t: 'Inversores y Marketing', ids: ['atencion', 'marketing'] },
+  { t: 'Legal y Cumplimiento', ids: ['legal', 'cumplimiento'] },
+  { t: 'Finanzas y Proyectos', ids: ['finanzas', 'analista'] }
+];
+const IDEAS = [
+  'Plan para conseguir 20 inversores nuevos para MAR-01 este mes',
+  'Calendario de publicaciones para Facebook de las próximas 2 semanas',
+  'Evaluá si conviene tokenizar la invernada de Charlone',
+  'Revisá riesgos regulatorios de lanzar MARTOKEN Deudas'
+];
+const EST = { pendiente: 'en cola', trabajando: 'trabajando', lista: 'lista', error: 'error', planificando: 'planificando', terminada: 'terminada' };
+
+/* ---------- utilidades ---------- */
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { 'x-admin-key': KEY, 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+  if (res.status === 401) { salir(); throw new Error('Sesión vencida.'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+}
+const post = (path, body) => api(path, { method: 'POST', body: JSON.stringify(body) });
+const esc = (s) => String(s ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+const hora = (iso) => iso ? new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+// Markdown simple → HTML (títulos, negrita, listas, párrafos)
+function md(txt) {
+  const lines = esc(txt).split('\n');
+  let html = '', lista = null;
+  const cerrar = () => { if (lista) { html += `</${lista}>`; lista = null; } };
+  for (let l of lines) {
+    l = l.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|\s)\*(\S[^*]*?)\*/g, '$1<b>$2</b>');
+    let m;
+    if ((m = l.match(/^\s*#{1,6}\s+(.*)/))) { cerrar(); html += `<h4>${m[1]}</h4>`; }
+    else if ((m = l.match(/^\s*[-•*]\s+(.*)/))) { if (lista !== 'ul') { cerrar(); html += '<ul>'; lista = 'ul'; } html += `<li>${m[1]}</li>`; }
+    else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))) { if (lista !== 'ol') { cerrar(); html += '<ol>'; lista = 'ol'; } html += `<li>${m[1]}</li>`; }
+    else if (/^\s*\|/.test(l)) { cerrar(); html += `<p style="font-family:var(--mono);font-size:12px;white-space:pre">${l}</p>`; }
+    else if (l.trim()) { cerrar(); html += `<p>${l}</p>`; }
+    else cerrar();
+  }
+  cerrar();
+  return html;
+}
+function avatar(id, cls = '') {
+  const a = porId[id] || { color: '#888', inicial: '?' };
+  return `<div class="avatar ${cls}" style="background:${a.color}">${esc(a.inicial)}<span class="dot"></span></div>`;
+}
+
+/* ---------- login ---------- */
+async function entrar() {
+  const p = $('pass').value;
+  try {
+    const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: p }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Error');
+    KEY = p; sessionStorage.setItem('mar_admin', p); iniciar();
+  } catch (e) { $('loginMsg').textContent = e.message; }
+}
+function salir() { sessionStorage.removeItem('mar_admin'); KEY = ''; $('app').style.display = 'none'; $('login').style.display = 'block'; }
+
+/* ---------- oficina ---------- */
+async function cargarOficina() {
+  const d = await api('/api/admin/equipo');
+  AGENTES = d.agentes; porId = Object.fromEntries(AGENTES.map((a) => [a.id, a]));
+  const ocupados = Object.fromEntries(d.ocupados.map((o) => [o.agente, o.tarea]));
+  $('planta').innerHTML = SALAS.map((s) => `
+    <div class="sala"><h4>${esc(s.t)}</h4>
+      ${s.ids.map((id) => { const a = porId[id]; if (!a) return ''; const oc = ocupados[id];
+        return `<div class="puesto ${oc ? 'ocupado' : ''}" data-id="${id}" title="${esc(oc || a.lema)}">
+          ${avatar(id)}
+          <div style="min-width:0"><div class="nm">${esc(a.nombre)}</div><div class="rl">${esc(a.puesto)}</div>
+          <div class="st">${oc ? '● trabajando en una misión' : '● disponible'}</div></div></div>`; }).join('')}
+    </div>`).join('');
+  document.querySelectorAll('.puesto').forEach((el) => el.onclick = () => abrirFicha(el.dataset.id));
+  const n = Object.keys(ocupados).length;
+  $('estadoGral').textContent = `${AGENTES.length} agentes · ${n ? n + ' trabajando' : 'todos disponibles'}`;
+  $('feed').innerHTML = d.actividad.length
+    ? d.actividad.map((x) => `<div>${hora(x.finished_at)} · <b>${esc(porId[x.agente]?.nombre || x.agente)}</b> ${x.estado === 'error' ? 'tuvo un error en' : 'terminó'}: ${esc(x.tarea.slice(0, 80))}</div>`).join('')
+    : '<div>Sin actividad todavía.</div>';
+  $('nAcc').textContent = d.acciones_pendientes;
+}
+
+/* ---------- ficha y chat ---------- */
+function abrirFicha(id) {
+  const a = porId[id]; agenteAbierto = id;
+  $('fAv').outerHTML = `<div class="avatar big" id="fAv" style="background:${a.color}">${esc(a.inicial)}</div>`;
+  $('fNombre').textContent = a.nombre; $('fPuesto').textContent = `${a.puesto} · ${a.area}`;
+  $('fPerfil').innerHTML = `
+    <p class="muted" style="margin-top:0">“${esc(a.lema)}”</p>
+    <h5>Responsabilidades</h5><ul>${a.responsabilidades.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+    <h5>Herramientas</h5><div class="chips">${a.herramientas.map((h) => `<span class="chip">${esc(h)}</span>`).join('')}</div>
+    <h5>Autonomía</h5><p style="margin:0;font-size:14px">${esc(a.autonomia)}</p>
+    <p class="muted" style="margin-top:14px">Ningún agente envía, publica, paga ni firma solo: todo lo que proponga queda en “Esperan tu aprobación”.</p>`;
+  pintarChat(); tab('perfil');
+  $('ficha').classList.add('open'); $('fichaBg').classList.add('open');
+}
+function cerrarFicha() { $('ficha').classList.remove('open'); $('fichaBg').classList.remove('open'); agenteAbierto = null; }
+function tab(t) {
+  document.querySelectorAll('.ftab').forEach((x) => x.classList.toggle('active', x.dataset.t === t));
+  $('fPerfil').style.display = t === 'perfil' ? 'block' : 'none';
+  $('fChat').style.display = t === 'chat' ? 'block' : 'none';
+  $('chatIn').style.display = t === 'chat' ? 'flex' : 'none';
+  if (t === 'chat') setTimeout(() => $('chatTxt').focus(), 50);
+}
+function pintarChat() {
+  const h = chats[agenteAbierto] || [];
+  const a = porId[agenteAbierto];
+  $('msgs').innerHTML = h.length
+    ? h.map((m) => `<div class="msg ${m.role === 'user' ? 'me' : 'ag'} md">${m.role === 'user' ? esc(m.content) : md(m.content)}</div>`).join('')
+    : `<div class="muted">Hablale directo a ${esc(a.nombre)}. Por ejemplo: “${esc(a.responsabilidades[0])}”.</div>`;
+  $('fChat').scrollTop = $('fChat').scrollHeight;
+}
+async function enviarChat() {
+  const txt = $('chatTxt').value.trim(); if (!txt || !agenteAbierto) return;
+  const id = agenteAbierto; const h = chats[id] = chats[id] || [];
+  const history = h.slice();
+  h.push({ role: 'user', content: txt }); $('chatTxt').value = ''; pintarChat();
+  $('msgs').insertAdjacentHTML('beforeend', '<div class="msg ag muted" id="pensando">Escribiendo…</div>');
+  $('chatEnviar').disabled = true;
+  try {
+    const r = await post('/api/admin/equipo/chat', { agente: id, message: txt, history });
+    let c = r.reply;
+    if (r.acciones && r.acciones.length) c += `\n\n(${r.acciones.length} acción(es) propuesta(s) enviadas a “Esperan tu aprobación”.)`;
+    h.push({ role: 'assistant', content: c });
+    if (r.acciones && r.acciones.length) cargarAcciones();
+  } catch (e) { h.push({ role: 'assistant', content: 'Error: ' + e.message }); }
+  $('chatEnviar').disabled = false;
+  if (agenteAbierto === id) pintarChat();
+}
+
+/* ---------- misiones ---------- */
+async function encargar() {
+  const pedido = $('pedido').value.trim(); if (!pedido) return;
+  $('btnMision').disabled = true; $('misionMsg').textContent = 'Enviando a la Directora…';
+  try {
+    const r = await post('/api/admin/equipo/mision', { pedido });
+    $('pedido').value = ''; $('misionMsg').textContent = '';
+    verMision(r.id); cargarHistorial();
+  } catch (e) { $('misionMsg').textContent = e.message; }
+  $('btnMision').disabled = false;
+}
+async function verMision(id) {
+  misionVista = id; clearTimeout(timerMision);
+  let m;
+  try { m = await api('/api/admin/equipo/mision/' + id); } catch (e) { $('misionActual').innerHTML = `<div class="card muted">${esc(e.message)}</div>`; return; }
+  if (misionVista !== id) return;
+  const enCurso = m.estado === 'planificando' || m.estado === 'trabajando';
+  $('misionActual').innerHTML = `
+    <div class="card">
+      <div style="display:flex; gap:10px; align-items:flex-start;">
+        ${avatar('directora')}
+        <div style="flex:1">
+          <div style="font-weight:600">${esc(m.pedido)}</div>
+          <div class="muted">${hora(m.created_at)} · ${m.resumen_plan ? esc(m.resumen_plan) : 'Victoria está armando el plan…'}</div>
+        </div>
+        <span class="badge ${m.estado}">${EST[m.estado] || m.estado}</span>
+      </div>
+      <div style="margin-top:12px">
+        ${m.tareas.map((t) => `
+          <div class="tarea">${avatar(t.agente)}
+            <div style="flex:1; min-width:0">
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                <b style="font-size:14px">${esc(porId[t.agente]?.nombre || t.agente)}</b>
+                <span class="muted">${esc(porId[t.agente]?.puesto || '')}</span>
+                <span class="badge ${t.estado}">${EST[t.estado] || t.estado}</span>
+              </div>
+              <div style="font-size:13.5px; margin-top:2px">${esc(t.tarea)}</div>
+              ${t.resultado ? `<details class="res"><summary>Ver lo que hizo</summary><div class="md">${md(t.resultado)}</div></details>` : ''}
+            </div>
+          </div>`).join('')}
+      </div>
+      ${m.informe ? `<div class="informe"><div class="section-t" style="margin:0 0 6px">Informe de Victoria</div><div class="md">${md(m.informe)}</div></div>` : ''}
+      ${m.error ? `<div class="informe" style="border-color:var(--err);background:rgba(239,107,107,.08)">No se pudo terminar: ${esc(m.error)}</div>` : ''}
+      ${m.acciones.length ? `<div class="muted" style="margin-top:10px">Esta misión dejó ${m.acciones.length} acción(es) para que apruebes (columna de la derecha).</div>` : ''}
+    </div>`;
+  if (enCurso) timerMision = setTimeout(() => { verMision(id); cargarOficina().catch(() => {}); }, 4000);
+  else { cargarOficina().catch(() => {}); cargarAcciones(); cargarHistorial(); }
+}
+async function cargarHistorial() {
+  const l = await api('/api/admin/equipo/misiones');
+  $('historial').innerHTML = l.length
+    ? l.map((m) => `<div class="hist-item" data-id="${m.id}"><div class="p">${esc(m.pedido.slice(0, 110))}</div><div class="muted">${hora(m.created_at)} · <span class="badge ${m.estado}">${EST[m.estado] || m.estado}</span></div></div>`).join('')
+    : '<div class="muted">Todavía no hay misiones.</div>';
+  document.querySelectorAll('.hist-item').forEach((el) => el.onclick = () => { verMision(Number(el.dataset.id)); window.scrollTo({ top: $('misionActual').offsetTop - 80, behavior: 'smooth' }); });
+}
+async function cargarAcciones() {
+  const l = await api('/api/admin/equipo/acciones');
+  $('nAcc').textContent = l.length;
+  $('acciones').innerHTML = l.length
+    ? l.map((a) => `<div class="accion">${avatar(a.agente)}
+        <div class="txt"><b>${esc(porId[a.agente]?.nombre || a.agente)}</b> propone:<br>${esc(a.descripcion)}<div class="muted">${hora(a.created_at)}</div></div>
+        <div class="btns"><button class="btn small ok" data-a="${a.id}" data-v="1">Aprobar</button><button class="btn small ghost" data-a="${a.id}" data-v="0">Descartar</button></div></div>`).join('')
+      + '<p class="muted" style="margin-bottom:0">Aprobar deja registro de tu decisión: la acción la hacés vos (o la ejecutamos desde WhatsApp / el panel).</p>'
+    : '<div class="muted">Nada pendiente.</div>';
+  document.querySelectorAll('[data-a]').forEach((b) => b.onclick = async () => {
+    b.disabled = true;
+    await post('/api/admin/equipo/accion/' + b.dataset.a, { aprobar: b.dataset.v === '1' });
+    cargarAcciones();
+  });
+}
+
+/* ---------- arranque ---------- */
+async function iniciar() {
+  $('login').style.display = 'none'; $('app').style.display = 'block';
+  try {
+    await cargarOficina();
+    await Promise.all([cargarHistorial(), cargarAcciones()]);
+    const ult = (await api('/api/admin/equipo/misiones'))[0];
+    if (ult) verMision(ult.id);
+  } catch (e) { $('estadoGral').textContent = e.message; }
+}
+$('ideas').innerHTML = IDEAS.map((i) => `<button class="idea">${esc(i)}</button>`).join('');
+document.querySelectorAll('.idea').forEach((b) => b.onclick = () => { $('pedido').value = b.textContent; $('pedido').focus(); });
+$('loginBtn').onclick = entrar;
+$('pass').onkeydown = (e) => { if (e.key === 'Enter') entrar(); };
+$('logout').onclick = (e) => { e.preventDefault(); salir(); };
+$('btnMision').onclick = encargar;
+$('pedido').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) encargar(); };
+$('fCerrar').onclick = cerrarFicha; $('fichaBg').onclick = cerrarFicha;
+document.querySelectorAll('.ftab').forEach((t) => t.onclick = () => tab(t.dataset.t));
+$('chatEnviar').onclick = enviarChat;
+$('chatTxt').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarChat(); } };
+setInterval(() => { if (KEY && !document.hidden) { cargarOficina().catch(() => {}); } }, 20000);
+
+if (KEY) iniciar(); else $('login').style.display = 'block';

@@ -129,14 +129,14 @@ async function chat({ modulo = 'todos', message, history = [], extra = '', maxTo
 }
 
 // Llamada genérica al modelo (para extracción de leads y reportes)
-async function complete(systemMsg, userMsg, { json = false, maxTokens = 700 } = {}) {
+async function complete(systemMsg, userMsg, { json = false, maxTokens = 700, temperature = 0.1 } = {}) {
   const body = {
     model: MODEL,
     messages: [
       { role: 'system', content: systemMsg },
       { role: 'user', content: userMsg }
     ],
-    temperature: 0.1,
+    temperature,
     max_tokens: maxTokens
   };
   if (json) body.response_format = { type: 'json_object' };

@@ -116,3 +116,27 @@ Bot de MARTOKEN para WhatsApp + bandeja + campañas con plantillas. Funciona con
 **Webhook en Meta**: URL `https://agente-mar.onrender.com/webhook/whatsapp`, token de verificación = el mismo `WHATSAPP_VERIFY_TOKEN`. Suscribir los campos `messages` y `smb_message_echoes`.
 
 **Importante**: sin disco persistente (plan Starter + disk), las conversaciones se borran en cada deploy.
+
+---
+
+## Oficina MARTOKEN (equipo de agentes) — `/oficina`
+
+Un equipo de 9 agentes, cada uno con su puesto, responsabilidades y nivel de autonomía:
+
+| Agente | Puesto |
+|---|---|
+| Victoria | Directora de Operaciones (reparte las misiones y arma el informe final) |
+| Lucía | Captación de Inversores |
+| Tomás | Prospección de Empresas |
+| Sofía | Atención al Inversor |
+| Bruno | Marketing y Contenido |
+| Martina | Legal y Fiduciario |
+| Diego | Finanzas y Retornos |
+| Ramiro | Analista de Proyectos |
+| Elena | Cumplimiento Regulatorio |
+
+- **Centro de misiones:** escribís un pedido, Victoria lo divide en hasta 4 tareas, cada agente hace la suya (con la documentación y los datos de leads/WhatsApp) y al final ella entrega un informe.
+- **Chat directo:** tocás a un agente en la planta y le hablás.
+- **Esperan tu aprobación:** ningún agente envía, publica, paga ni firma solo. Lo que proponen queda en esa lista para que lo apruebes o lo descartes.
+- Usa la misma contraseña del panel (`ADMIN_PASSWORD`) y las mismas keys de Groq. No hace falta configurar nada nuevo.
+- Para cambiar nombres, roles o instrucciones de los agentes: `src/equipo.js`.

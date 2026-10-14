@@ -13,8 +13,11 @@ const leads = require('./src/leads');
 const report = require('./src/report');
 const whatsapp = require('./src/whatsapp');
 const { notifyEmail } = require('./src/notify');
+const equipo = require('./src/equipo');
 
 initDb();
+equipo.initEquipo();
+equipo.limpiarMisionesColgadas();
 
 const app = express();
 // Guardamos el cuerpo crudo para validar la firma de los webhooks de Meta
@@ -435,6 +438,45 @@ app.post('/api/leads/import', async (req, res) => {
     console.error('[/api/leads/import] ERROR:', e && e.stack ? e.stack : e);
     res.status(500).json({ error: e.message });
   }
+});
+
+/* ---------------------- OFICINA MARTOKEN (equipo de agentes) ---------------------- */
+app.get('/api/admin/equipo', requireAdmin, (req, res) => {
+  res.json({ agentes: equipo.listarAgentes(), ...equipo.estadoOficina() });
+});
+
+app.post('/api/admin/equipo/chat', requireAdmin, async (req, res) => {
+  try {
+    const { agente, message, history } = req.body || {};
+    if (!message || !String(message).trim()) return res.status(400).json({ error: 'Mensaje vacío.' });
+    res.json(await equipo.chatConAgente({ agente, message, history: Array.isArray(history) ? history : [] }));
+  } catch (e) {
+    console.error('[/api/admin/equipo/chat] ERROR:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/equipo/mision', requireAdmin, (req, res) => {
+  try {
+    res.json({ ok: true, id: equipo.crearMision((req.body || {}).pedido) });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.get('/api/admin/equipo/misiones', requireAdmin, (req, res) => res.json(equipo.listarMisiones()));
+
+app.get('/api/admin/equipo/mision/:id', requireAdmin, (req, res) => {
+  const m = equipo.obtenerMision(req.params.id);
+  if (!m) return res.status(404).json({ error: 'Misión no encontrada.' });
+  res.json(m);
+});
+
+app.get('/api/admin/equipo/acciones', requireAdmin, (req, res) => res.json(equipo.listarAcciones(req.query.estado || 'pendiente')));
+
+app.post('/api/admin/equipo/accion/:id', requireAdmin, (req, res) => {
+  equipo.decidirAccion(req.params.id, !!(req.body || {}).aprobar);
+  res.json({ ok: true });
 });
 
 /* ---------------------- HEALTH ---------------------- */
