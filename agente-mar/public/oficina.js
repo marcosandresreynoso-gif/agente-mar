@@ -161,9 +161,38 @@ async function enviarChat() {
     if (r.acciones && r.acciones.length) c += `\n\n(${r.acciones.length} acción(es) propuesta(s) enviadas a “Esperan tu aprobación”.)`;
     h.push({ role: 'assistant', content: c });
     if (r.acciones && r.acciones.length) cargarAcciones();
+    if (r.mision_id) { seguirMisionEnChat(id, r.mision_id); verMision(r.mision_id); cargarHistorial(); }
   } catch (e) { h.push({ role: 'assistant', content: 'Error: ' + e.message }); }
   $('chatEnviar').disabled = false;
   if (agenteAbierto === id) pintarChat();
+}
+
+// Cuando Victoria reparte una misión desde el chat, el avance y el informe aparecen en su chat
+async function seguirMisionEnChat(agenteId, misionId) {
+  const h = chats[agenteId] = chats[agenteId] || [];
+  const estado = { role: 'assistant', content: 'Armando el plan…' };
+  h.push(estado); if (agenteAbierto === agenteId) pintarChat();
+  for (let i = 0; i < 120; i++) {               // hasta ~10 minutos
+    await new Promise((r) => setTimeout(r, 5000));
+    let m; try { m = await api('/api/admin/equipo/mision/' + misionId); } catch (e) { continue; }
+    const lineas = m.tareas.map((t) => `- ${porId[t.agente]?.nombre || t.agente} (${porId[t.agente]?.puesto || ''}): ${EST[t.estado] || t.estado}`);
+    estado.content = (m.resumen_plan ? m.resumen_plan + '\n\n' : 'Armando el plan…\n\n') + lineas.join('\n');
+    if (m.estado === 'terminada') {
+      estado.content += '\n\nEquipo terminado.';
+      let inf = '## Informe\n' + (m.informe || '');
+      if (m.acciones.length) inf += `\n\n(${m.acciones.length} acción(es) para aprobar en “Esperan tu aprobación”.)`;
+      h.push({ role: 'assistant', content: inf });
+      cargarAcciones(); cargarHistorial();
+      if (agenteAbierto === agenteId) pintarChat();
+      return;
+    }
+    if (m.estado === 'error') {
+      estado.content += '\n\nNo se pudo terminar: ' + (m.error || 'error desconocido');
+      if (agenteAbierto === agenteId) pintarChat();
+      return;
+    }
+    if (agenteAbierto === agenteId) pintarChat();
+  }
 }
 
 /* ---------- misiones ---------- */

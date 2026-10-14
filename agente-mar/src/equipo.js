@@ -49,7 +49,7 @@ const AGENTES = {
     lema: 'Divide lo imposible en pasos chicos.',
     responsabilidades: ['Analizar tus pedidos', 'Dividirlos en tareas', 'Asignar a cada agente', 'Unir los resultados en un informe', 'Avisarte qué necesita tu aprobación'],
     herramientas: ['Equipo completo', 'Historial de misiones'],
-    autonomia: 'Organiza y reparte. No ejecuta acciones externas.',
+    autonomia: 'Escribile tu pedido por chat: arma la misión, la reparte al equipo y te deja el informe ahí mismo. No ejecuta acciones externas.',
     rag: 'todos',
     prompt:
       'Sos la Directora de Operaciones de MARTOKEN. Coordinás al equipo, priorizás con el criterio ' +
@@ -301,6 +301,18 @@ function separarAcciones(texto) {
 /* ============================ CHAT DIRECTO CON UN AGENTE ============================ */
 async function chatConAgente({ agente, message, history = [] }) {
   if (!AGENTES[agente]) throw new Error('Ese agente no existe.');
+  // Victoria (Directora): si le pedís un trabajo, arma una misión y la reparte al equipo.
+  // Saludos o mensajes muy cortos los contesta ella sola.
+  if (agente === 'directora' && String(message).trim().length >= 20) {
+    const previos = history.filter((h) => h.role === 'user').slice(-2).map((h) => String(h.content || '').slice(0, 800));
+    const pedido = (previos.length ? `Contexto de lo que Marcos venía hablando: ${previos.join(' / ')}\n\n` : '') + String(message).slice(0, 2500);
+    const id = crearMision(pedido);
+    return {
+      reply: 'Recibido. Armo la misión y la reparto al equipo. Te voy contando acá quién trabaja en qué y, cuando terminen, te dejo el informe en este chat.',
+      acciones: [],
+      mision_id: id
+    };
+  }
   const hist = history.slice(-6).map((h) => `${h.role === 'user' ? 'Marcos' : AGENTES[agente].nombre}: ${String(h.content || '').slice(0, 1500)}`).join('\n');
   const user = (hist ? `Conversación hasta ahora:\n${hist}\n\n` : '') + `Marcos: ${String(message).slice(0, 4000)}`;
   const out = await complete(promptAgente(agente, message), user, { maxTokens: 1000, temperature: 0.4, maxEsperaMs: 45000 });
