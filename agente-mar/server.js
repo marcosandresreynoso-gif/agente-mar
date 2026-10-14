@@ -442,7 +442,11 @@ app.post('/api/leads/import', async (req, res) => {
 
 /* ---------------------- OFICINA MARTOKEN (equipo de agentes) ---------------------- */
 app.get('/api/admin/equipo', requireAdmin, (req, res) => {
-  res.json({ agentes: equipo.listarAgentes(), ...equipo.estadoOficina() });
+  res.json({ agentes: equipo.listarAgentes(), foco: equipo.getFoco(), ...equipo.estadoOficina() });
+});
+
+app.post('/api/admin/equipo/foco', requireAdmin, (req, res) => {
+  res.json({ ok: true, foco: equipo.setFoco((req.body || {}).foco) });
 });
 
 app.post('/api/admin/equipo/chat', requireAdmin, async (req, res) => {

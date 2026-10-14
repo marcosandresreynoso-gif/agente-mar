@@ -16,10 +16,12 @@ const SALAS = [
   { t: 'Finanzas y Proyectos', ids: ['finanzas', 'analista'] }
 ];
 const IDEAS = [
-  'Plan para conseguir 20 inversores nuevos para MAR-01 este mes',
-  'Calendario de publicaciones para Facebook de las próximas 2 semanas',
-  'Evaluá si conviene tokenizar la invernada de Charlone',
-  'Revisá riesgos regulatorios de lanzar MARTOKEN Deudas'
+  'Plan para conseguir 300 preinscriptos para MAR-50 este mes',
+  '5 anuncios para Facebook e Instagram que lleven a la preinscripción de MAR-50',
+  'Mensajes de WhatsApp para los interesados que todavía no se preinscribieron en MAR-50',
+  'Lista de municipios, gremios y empresas para difundir MAR-50 y el primer mensaje para cada uno',
+  'Preguntas frecuentes de MAR-50 con sus respuestas',
+  'Revisá que la comunicación de MAR-50 no tenga riesgos regulatorios'
 ];
 const EST = { pendiente: 'en cola', trabajando: 'trabajando', lista: 'lista', error: 'error', planificando: 'planificando', terminada: 'terminada' };
 
@@ -89,6 +91,27 @@ async function cargarOficina() {
     ? d.actividad.map((x) => `<div>${hora(x.finished_at)} · <b>${esc(porId[x.agente]?.nombre || x.agente)}</b> ${x.estado === 'error' ? 'tuvo un error en' : 'terminó'}: ${esc(x.tarea.slice(0, 80))}</div>`).join('')
     : '<div>Sin actividad todavía.</div>';
   $('nAcc').textContent = d.acciones_pendientes;
+  if ($('focoTxt').style.display === 'none') { FOCO = d.foco; $('focoVer').innerHTML = md(FOCO); }
+}
+
+/* ---------- foco del equipo ---------- */
+let FOCO = '';
+function editarFoco(on) {
+  $('focoTxt').style.display = on ? 'block' : 'none';
+  $('focoVer').style.display = on ? 'none' : 'block';
+  $('focoEditar').style.display = on ? 'none' : '';
+  $('focoGuardar').style.display = $('focoCancelar').style.display = on ? '' : 'none';
+  if (on) { $('focoTxt').value = FOCO; $('focoTxt').focus(); }
+  $('focoMsg').textContent = '';
+}
+async function guardarFoco() {
+  $('focoGuardar').disabled = true;
+  try {
+    const r = await post('/api/admin/equipo/foco', { foco: $('focoTxt').value });
+    FOCO = r.foco; $('focoVer').innerHTML = md(FOCO); editarFoco(false);
+    $('focoMsg').textContent = 'Guardado. El equipo ya trabaja con este foco.';
+  } catch (e) { $('focoMsg').textContent = e.message; }
+  $('focoGuardar').disabled = false;
 }
 
 /* ---------- ficha y chat ---------- */
@@ -226,6 +249,9 @@ $('loginBtn').onclick = entrar;
 $('pass').onkeydown = (e) => { if (e.key === 'Enter') entrar(); };
 $('logout').onclick = (e) => { e.preventDefault(); salir(); };
 $('btnMision').onclick = encargar;
+$('focoEditar').onclick = () => editarFoco(true);
+$('focoCancelar').onclick = () => editarFoco(false);
+$('focoGuardar').onclick = guardarFoco;
 $('pedido').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) encargar(); };
 $('fCerrar').onclick = cerrarFicha; $('fichaBg').onclick = cerrarFicha;
 document.querySelectorAll('.ftab').forEach((t) => t.onclick = () => tab(t.dataset.t));
