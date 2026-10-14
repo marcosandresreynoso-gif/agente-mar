@@ -86,7 +86,7 @@ async function cargarOficina() {
     </div>`).join('');
   document.querySelectorAll('.puesto').forEach((el) => el.onclick = () => abrirFicha(el.dataset.id));
   const n = Object.keys(ocupados).length;
-  $('estadoGral').textContent = `${AGENTES.length} agentes · ${n ? n + ' trabajando' : 'todos disponibles'}`;
+  $('estadoGral').textContent = `${AGENTES.length} agentes · ${n ? n + ' trabajando' : 'todos disponibles'} · Groq: ${d.groq_keys} de 4 keys`;
   $('feed').innerHTML = d.actividad.length
     ? d.actividad.map((x) => `<div>${hora(x.finished_at)} · <b>${esc(porId[x.agente]?.nombre || x.agente)}</b> ${x.estado === 'error' ? 'tuvo un error en' : 'terminó'}: ${esc(x.tarea.slice(0, 80))}</div>`).join('')
     : '<div>Sin actividad todavía.</div>';

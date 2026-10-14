@@ -21,19 +21,38 @@ function nextKey() {
   return key;
 }
 
-async function fetchGroq(body, intentos = Math.max(GROQ_KEYS.length, 1)) {
-  if (GROQ_KEYS.length === 0) throw new Error('No hay ninguna GROQ_API_KEY configurada.');
-  for (let i = 0; i < intentos; i++) {
-    const key = nextKey();
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify(body)
-    });
-    if (res.status === 429) continue; // key al límite → siguiente
-    return res;
+// Groq gratis limita pedidos y "tokens por minuto" por cada key.
+// Si todas las keys están al límite, en vez de fallar de una, ESPERA lo que Groq indica y reintenta,
+// hasta un máximo (maxEsperaMs). Las misiones del equipo esperan más; el chat público, poco.
+const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchGroq(body, { maxEsperaMs = 15000 } = {}) {
+  if (GROQ_KEYS.length === 0) throw new Error('No hay ninguna GROQ_API_KEY configurada en Render.');
+  const limite = Date.now() + maxEsperaMs;
+  for (;;) {
+    let esperaSugerida = 0;
+    for (let i = 0; i < GROQ_KEYS.length; i++) {
+      const key = nextKey();
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify(body)
+      });
+      if (res.status !== 429) return res;
+      // Groq dice cuántos segundos esperar (retry-after); si no, 6 s
+      const ra = parseFloat(res.headers.get('retry-after')) || 6;
+      esperaSugerida = esperaSugerida ? Math.min(esperaSugerida, ra) : ra;
+      await res.text().catch(() => {});
+    }
+    const espera = Math.min(Math.max(esperaSugerida, 1) * 1000 + 500, 30000);
+    if (Date.now() + espera > limite) {
+      throw new Error(
+        `Groq está al límite (${GROQ_KEYS.length} key${GROQ_KEYS.length === 1 ? '' : 's'} cargada${GROQ_KEYS.length === 1 ? '' : 's'}). Probá de nuevo en un minuto.`
+      );
+    }
+    console.log(`[groq] keys al límite, espero ${Math.round(espera / 1000)} s y reintento`);
+    await dormir(espera);
   }
-  throw new Error('Todas las keys de Groq están al límite. Intentá en unos minutos.');
 }
 
 const MODULOS = {
@@ -129,7 +148,7 @@ async function chat({ modulo = 'todos', message, history = [], extra = '', maxTo
 }
 
 // Llamada genérica al modelo (para extracción de leads y reportes)
-async function complete(systemMsg, userMsg, { json = false, maxTokens = 700, temperature = 0.1 } = {}) {
+async function complete(systemMsg, userMsg, { json = false, maxTokens = 700, temperature = 0.1, maxEsperaMs = 15000 } = {}) {
   const body = {
     model: MODEL,
     messages: [
@@ -141,10 +160,13 @@ async function complete(systemMsg, userMsg, { json = false, maxTokens = 700, tem
   };
   if (json) body.response_format = { type: 'json_object' };
 
-  const res = await fetchGroq(body);
+  const res = await fetchGroq(body, { maxEsperaMs });
   if (!res.ok) throw new Error(`Groq ${res.status}`);
   const data = await res.json();
   return data.choices?.[0]?.message?.content?.trim() || '';
 }
 
-module.exports = { chat, complete, MODULOS };
+const cantidadKeys = () => GROQ_KEYS.length;
+console.log(`[groq] ${GROQ_KEYS.length} key(s) de Groq cargada(s)`);
+
+module.exports = { chat, complete, MODULOS, cantidadKeys };
