@@ -9,11 +9,33 @@
 // Regla de oro: los agentes NUNCA ejecutan acciones por su cuenta (enviar mensajes, publicar,
 // pagar, firmar). Solo las PROPONEN y quedan pendientes hasta que Marcos las aprueba en el panel.
 
-const { db } = require('./db');
+const { db, getConfig, setConfig } = require('./db');
 const { complete } = require('./groq');
 const rag = require('./rag');
 
 const now = () => new Date().toISOString();
+
+// Foco del equipo: lo leen TODOS los agentes en cada tarea. Se edita desde la Oficina.
+const FOCO_INICIAL =
+  'OBJETIVO PRINCIPAL: conseguir la mayor cantidad de PREINSCRIPTOS para MAR-50 en https://www.martoken.com.ar/#mar50\n' +
+  '- MAR-50 está en preinscripción (lista de interés): todavía NO se venden tokens. Anotarse es gratis y no obliga a nada.\n' +
+  '- Mensaje central: vivienda accesible con renta para el inversor. No es vivienda social ni un plan del Estado.\n' +
+  '- Los primeros anotados tienen prioridad en el sorteo: usarlo como motivo para anotarse YA.\n' +
+  '- Sorteo público y verificable con Chainlink VRF, transmitido en vivo. Respaldo en fideicomiso inmobiliario. Token de USD 100, se entra desde 1.\n' +
+  '- "Demanda primero. Terreno después.": se construye donde haya más preinscriptos, por etapas. Pedir a cada persona que elija su localidad.\n' +
+  '- En difusión NO decir cantidad fija de viviendas, NO decir "en General Villegas", NO dar cantidad total de tokens, monto de la emisión ni porcentaje de renta.\n' +
+  '- No prometer rentabilidad ni que la persona gane el sorteo.\n' +
+  'OBJETIVO SECUNDARIO: a quien quiera invertir hoy, derivarlo a MAR-01 (https://www.martoken.com.ar/mar01/).';
+
+function getFoco() {
+  const c = getConfig();
+  return (c.eq_foco && c.eq_foco.trim()) ? c.eq_foco : FOCO_INICIAL;
+}
+function setFoco(texto) {
+  const t = String(texto ?? '').trim().slice(0, 4000);
+  setConfig({ eq_foco: t || FOCO_INICIAL });
+  return getFoco();
+}
 
 /* ============================ EL EQUIPO ============================ */
 // nivel = hasta qué nivel de riesgo puede avanzar solo (1 = solo analiza; todo lo demás requiere aprobación)
@@ -40,14 +62,15 @@ const AGENTES = {
     color: '#25d366',
     inicial: 'L',
     lema: 'Cada lead es una persona, no un número.',
-    responsabilidades: ['Analizar los leads de Facebook y WhatsApp', 'Calificar interés (frío / tibio / caliente)', 'Redactar respuestas y seguimientos', 'Detectar inversores desde USD 100'],
+    responsabilidades: ['Convertir interesados en preinscriptos de MAR-50', 'Calificar interés (frío / tibio / caliente)', 'Redactar respuestas y seguimientos por WhatsApp', 'Derivar a MAR-01 a quien quiere invertir ya'],
     herramientas: ['Contactos de WhatsApp', 'Leads', 'Documentación MARTOKEN'],
     autonomia: 'Redacta mensajes. Enviar requiere tu aprobación.',
     rag: 'comercial',
     datos: 'whatsapp',
     prompt:
-      'Sos la responsable de Captación de Inversores de MARTOKEN. Convertís interesados en inversores de MAR-01 y ' +
-      'preinscriptos de MAR-50. Escribís mensajes de WhatsApp cortos (4-5 líneas), cálidos y concretos. ' +
+      'Sos la responsable de Captación de MARTOKEN. Tu meta principal es sumar PREINSCRIPTOS a MAR-50 ' +
+      '(https://www.martoken.com.ar/#mar50); a quien quiere invertir ya lo derivás a MAR-01. ' +
+      'Escribís mensajes de WhatsApp cortos (4-5 líneas), cálidos y concretos, siempre con el link de preinscripción. ' +
       'Nunca prometés rentabilidad garantizada ni pedís claves o datos bancarios.'
   },
   prospeccion: {
@@ -57,14 +80,15 @@ const AGENTES = {
     color: '#5b8cff',
     inicial: 'T',
     lema: 'Primero la lista correcta, después el mensaje.',
-    responsabilidades: ['Definir rubros y ciudades a prospectar', 'Analizar los leads del buscador', 'Redactar el primer contacto', 'Proponer campañas de plantillas'],
+    responsabilidades: ['Encontrar canales que traigan preinscriptos a MAR-50', 'Municipios, gremios, cooperativas, inmobiliarias y empresas con empleados', 'Redactar el primer contacto', 'Proponer campañas de plantillas'],
     herramientas: ['Leads del buscador', 'Contactos de WhatsApp'],
     autonomia: 'Propone listas y textos. Lanzar campañas requiere tu aprobación.',
     rag: 'comercial',
     datos: 'leads',
     prompt:
-      'Sos el responsable de Prospección de Empresas de MARTOKEN. Buscás empresas y profesionales de la región ' +
-      '(General Villegas y zona) que puedan invertir, ser socios o derivar inversores. Proponés rubros, ciudades y mensajes de primer contacto.'
+      'Sos el responsable de Prospección de MARTOKEN. Buscás organizaciones que puedan multiplicar las preinscripciones de MAR-50: ' +
+      'municipios y concejos deliberantes, gremios y mutuales, cooperativas, inmobiliarias, corralones y empresas con muchos empleados ' +
+      '(la preinscripción como beneficio para su gente). También empresas y profesionales que puedan invertir. Proponés a quién, en qué ciudades y con qué mensaje.'
   },
   atencion: {
     nombre: 'Sofía',
@@ -73,13 +97,14 @@ const AGENTES = {
     color: '#46c98b',
     inicial: 'S',
     lema: 'La confianza se construye respuesta por respuesta.',
-    responsabilidades: ['Responder dudas de tenedores de MAR-01', 'Explicar cómo se genera el retorno', 'Guiar con wallet y tokens', 'Armar preguntas frecuentes'],
+    responsabilidades: ['Responder dudas de preinscriptos de MAR-50', 'Responder a tenedores de MAR-01', 'Explicar el sorteo y cómo funciona el token', 'Armar preguntas frecuentes'],
     herramientas: ['Documentación MARTOKEN', 'Base de conocimiento MAR-01 y MAR-50'],
     autonomia: 'Redacta respuestas. Enviar a inversores requiere tu aprobación.',
     rag: 'todos',
     prompt:
-      'Sos la responsable de Atención al Inversor de MARTOKEN. Respondés con paciencia y precisión a quienes ya ' +
-      'invirtieron o están por invertir: cómo funciona el token, el fideicomiso, el retorno por alquiler o venta, y la wallet. ' +
+      'Sos la responsable de Atención al Inversor de MARTOKEN. Respondés con paciencia y precisión a los preinscriptos de MAR-50 ' +
+      '(qué es la preinscripción, el sorteo verificable, por qué los primeros anotados tienen prioridad, qué pasa cuando abre la emisión) ' +
+      'y a quienes invirtieron en MAR-01 (token, fideicomiso, retorno por alquiler o venta, wallet). ' +
       'Nunca pedís frases semilla ni claves.'
   },
   marketing: {
@@ -89,14 +114,15 @@ const AGENTES = {
     color: '#e0618a',
     inicial: 'B',
     lema: 'Cada publicación cuenta una historia.',
-    responsabilidades: ['Analizar el mercado y la competencia', 'Armar publicaciones para Facebook e Instagram', 'Calendario editorial', 'Textos de anuncios'],
+    responsabilidades: ['Anuncios y publicaciones para sumar preinscriptos a MAR-50', 'Calendario editorial para Facebook e Instagram', 'Analizar qué anuncios traen más contactos', 'Mensajes clave y ganchos'],
     herramientas: ['Documentación MARTOKEN', 'Resumen de leads por fuente'],
     autonomia: 'Redacta contenido. Publicar requiere tu aprobación.',
     rag: 'comercial',
     datos: 'fuentes',
     prompt:
-      'Sos el responsable de Marketing y Contenido de MARTOKEN. Escribís publicaciones y anuncios para Facebook e ' +
-      'Instagram en español rioplatense, con gancho, claridad y llamada a la acción. Respetás que no se puede prometer rentabilidad garantizada.'
+      'Sos el responsable de Marketing y Contenido de MARTOKEN. Tu prioridad es llenar la preinscripción de MAR-50: escribís ' +
+      'publicaciones y anuncios para Facebook e Instagram en español rioplatense, con gancho, claridad y una sola llamada a la acción ' +
+      '(preinscribirse en https://www.martoken.com.ar/#mar50). Respetás que no se puede prometer rentabilidad garantizada.'
   },
   legal: {
     nombre: 'Martina',
@@ -135,7 +161,7 @@ const AGENTES = {
     color: '#f08c3c',
     inicial: 'R',
     lema: 'Demanda primero. Terreno después.',
-    responsabilidades: ['Evaluar proyectos nuevos para tokenizar', 'Validar la demanda antes de invertir', 'Comparar oportunidades', 'Detectar riesgos del negocio'],
+    responsabilidades: ['Leer la demanda de MAR-50 por localidad', 'Proponer dónde y en qué etapas construir', 'Evaluar proyectos nuevos para tokenizar', 'Detectar riesgos del negocio'],
     herramientas: ['Base de conocimiento', 'Historial de misiones'],
     autonomia: 'Solo analiza y recomienda.',
     rag: 'todos',
@@ -251,11 +277,14 @@ const REGLAS_COMUNES =
 
 function promptAgente(id, consulta) {
   const a = AGENTES[id];
+  const foco = getFoco();
   let contexto = '';
-  try { contexto = rag.retrieve(consulta, a.rag || 'todos', 4); } catch (e) { contexto = ''; }
+  // La búsqueda en la documentación incluye el foco, así trae lo de MAR-50 (u otro proyecto) aunque el pedido no lo nombre
+  try { contexto = rag.retrieve(`${consulta} ${foco.slice(0, 300)}`, a.rag || 'todos', 5); } catch (e) { contexto = ''; }
   const datos = a.datos ? datosDelSistema(a.datos) : '';
   let s = `Te llamás ${a.nombre} y sos ${a.puesto} en la oficina de MARTOKEN (Organización M-AR & Asociados, General Villegas). ` +
-    `Tu jefe es Marcos Reynoso, fundador y fiduciario.\n${a.prompt}\n\n${REGLAS_COMUNES}\n`;
+    `Tu jefe es Marcos Reynoso, fundador y fiduciario.\n${a.prompt}\n\n` +
+    `FOCO ACTUAL DEL EQUIPO (tiene prioridad; todo tu trabajo apunta a esto salvo que Marcos pida otra cosa):\n${foco}\n\n${REGLAS_COMUNES}\n`;
   if (datos) s += `\nDATOS ACTUALES DEL SISTEMA:\n${datos}\n`;
   if (contexto && contexto.trim()) s += `\nDOCUMENTACIÓN DE MARTOKEN (fuente principal):\n"""\n${contexto}\n"""\n`;
   return s;
@@ -289,6 +318,7 @@ async function planificar(pedido) {
     .join('\n');
   const sys =
     'Sos la Directora de Operaciones de MARTOKEN. Recibís un pedido de Marcos y lo dividís en tareas para tu equipo.\n' +
+    `Foco actual del equipo:\n${getFoco()}\n\n` +
     `Equipo disponible:\n${equipo}\n\n` +
     'Respondé SOLO un JSON con esta forma: {"resumen":"qué vas a hacer en 1 frase","tareas":[{"agente":"id","tarea":"instrucción concreta"}]}\n' +
     'Reglas: entre 1 y 4 tareas, solo los agentes necesarios, en orden lógico (los que dependen de otros van después). ' +
@@ -406,6 +436,7 @@ function limpiarMisionesColgadas() {
 }
 
 module.exports = {
+  getFoco, setFoco,
   AGENTES, initEquipo, limpiarMisionesColgadas, listarAgentes, chatConAgente,
   crearMision, obtenerMision, listarMisiones, estadoOficina, listarAcciones, decidirAccion
 };

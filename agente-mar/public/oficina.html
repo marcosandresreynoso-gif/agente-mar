@@ -61,6 +61,7 @@
     .md h3, .md h4 { margin: 14px 0 6px; font-size: 15px; }
     .md ul, .md ol { padding-left: 20px; margin: 6px 0; }
     .md p { margin: 6px 0; }
+    .foco { border-left: 3px solid var(--gold); }
     .informe { border-left: 3px solid var(--gold); background: var(--gold-soft); border-radius: 10px; padding: 12px 14px; margin-top: 12px; }
     .accion { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
     .accion:first-child { border-top: none; }
@@ -122,11 +123,23 @@
       <div class="section-t">Planta de la oficina <span class="muted" style="text-transform:none; letter-spacing:0;">— tocá a alguien para ver su ficha o hablarle</span></div>
       <div class="planta" id="planta"></div>
 
+      <div class="section-t">Foco del equipo <span class="muted" style="text-transform:none; letter-spacing:0;">— todos los agentes trabajan sobre esto</span></div>
+      <div class="card foco">
+        <div id="focoVer" class="md"></div>
+        <textarea class="mini" id="focoTxt" rows="11" style="display:none"></textarea>
+        <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+          <button class="btn ghost small" id="focoEditar">Editar foco</button>
+          <button class="btn small" id="focoGuardar" style="display:none">Guardar</button>
+          <button class="btn ghost small" id="focoCancelar" style="display:none">Cancelar</button>
+          <span class="muted" id="focoMsg"></span>
+        </div>
+      </div>
+
       <div class="grid2">
         <div>
           <div class="section-t">Centro de misiones</div>
           <div class="card">
-            <textarea class="mini" id="pedido" rows="3" placeholder="Ej: Armá un plan para conseguir 20 inversores nuevos para MAR-01 este mes"></textarea>
+            <textarea class="mini" id="pedido" rows="3" placeholder="Ej: Armá un plan para conseguir 300 preinscriptos para MAR-50 este mes"></textarea>
             <div class="ideas" id="ideas"></div>
             <div style="display:flex; gap:10px; align-items:center;">
               <button class="btn" id="btnMision">Encargar misión</button>
