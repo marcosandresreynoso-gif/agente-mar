@@ -158,12 +158,36 @@ async function complete(systemMsg, userMsg, { json = false, maxTokens = 700, tem
     temperature,
     max_tokens: maxTokens
   };
+  // Los modelos gpt-oss "piensan" antes de responder y ese razonamiento consume max_tokens:
+  // con poco margen la respuesta queda cortada y Groq rechaza el JSON (error 400).
+  const razona = /gpt-oss/i.test(MODEL);
+  if (razona) {
+    body.reasoning_effort = 'low';
+    body.max_tokens = Math.max(maxTokens + 1500, 2000);
+  }
   if (json) body.response_format = { type: 'json_object' };
 
-  const res = await fetchGroq(body, { maxEsperaMs });
-  if (!res.ok) throw new Error(`Groq ${res.status}`);
+  let res = await fetchGroq(body, { maxEsperaMs });
+  if (!res.ok && res.status === 400 && json) {
+    // Segundo intento sin el modo JSON estricto; el JSON se extrae del texto.
+    const t = await res.text().catch(() => '');
+    console.warn('[groq] 400 en modo JSON, reintento sin response_format:', t.slice(0, 200));
+    delete body.response_format;
+    body.max_tokens = Math.max(body.max_tokens, 3000);
+    res = await fetchGroq(body, { maxEsperaMs });
+  }
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Groq ${res.status}: ${t.slice(0, 200)}`);
+  }
   const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() || '';
+  let out = data.choices?.[0]?.message?.content?.trim() || '';
+  if (json) {
+    const ini = out.indexOf('{');
+    const fin = out.lastIndexOf('}');
+    if (ini > 0 || (fin >= 0 && fin < out.length - 1)) out = out.slice(ini, fin + 1);
+  }
+  return out;
 }
 
 const cantidadKeys = () => GROQ_KEYS.length;
