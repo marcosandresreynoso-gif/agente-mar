@@ -1,6 +1,8 @@
 // oficina.js — Oficina MARTOKEN (equipo de agentes)
 const $ = (id) => document.getElementById(id);
-let KEY = sessionStorage.getItem('mar_admin') || '';
+// En la app del celular la sesión queda guardada (si marcaste "Recordarme")
+const leer = (k) => { try { return localStorage.getItem(k) || sessionStorage.getItem(k) || ''; } catch (e) { return ''; } };
+let KEY = leer('mar_admin');
 let AGENTES = [];
 let porId = {};
 let agenteAbierto = null;
@@ -66,10 +68,12 @@ async function entrar() {
   try {
     const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: p }) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Error');
-    KEY = p; sessionStorage.setItem('mar_admin', p); iniciar();
+    KEY = p;
+    try { sessionStorage.setItem('mar_admin', p); if ($('recordar').checked) localStorage.setItem('mar_admin', p); } catch (e) {}
+    iniciar();
   } catch (e) { $('loginMsg').textContent = e.message; }
 }
-function salir() { sessionStorage.removeItem('mar_admin'); KEY = ''; $('app').style.display = 'none'; $('login').style.display = 'block'; }
+function salir() { try { sessionStorage.removeItem('mar_admin'); localStorage.removeItem('mar_admin'); } catch (e) {} KEY = ''; $('app').style.display = 'none'; $('login').style.display = 'block'; }
 
 /* ---------- oficina ---------- */
 async function cargarOficina() {
@@ -157,9 +161,38 @@ async function enviarChat() {
     if (r.acciones && r.acciones.length) c += `\n\n(${r.acciones.length} acción(es) propuesta(s) enviadas a “Esperan tu aprobación”.)`;
     h.push({ role: 'assistant', content: c });
     if (r.acciones && r.acciones.length) cargarAcciones();
+    if (r.mision_id) { seguirMisionEnChat(id, r.mision_id); verMision(r.mision_id); cargarHistorial(); }
   } catch (e) { h.push({ role: 'assistant', content: 'Error: ' + e.message }); }
   $('chatEnviar').disabled = false;
   if (agenteAbierto === id) pintarChat();
+}
+
+// Cuando Victoria reparte una misión desde el chat, el avance y el informe aparecen en su chat
+async function seguirMisionEnChat(agenteId, misionId) {
+  const h = chats[agenteId] = chats[agenteId] || [];
+  const estado = { role: 'assistant', content: 'Armando el plan…' };
+  h.push(estado); if (agenteAbierto === agenteId) pintarChat();
+  for (let i = 0; i < 120; i++) {               // hasta ~10 minutos
+    await new Promise((r) => setTimeout(r, 5000));
+    let m; try { m = await api('/api/admin/equipo/mision/' + misionId); } catch (e) { continue; }
+    const lineas = m.tareas.map((t) => `- ${porId[t.agente]?.nombre || t.agente} (${porId[t.agente]?.puesto || ''}): ${EST[t.estado] || t.estado}`);
+    estado.content = (m.resumen_plan ? m.resumen_plan + '\n\n' : 'Armando el plan…\n\n') + lineas.join('\n');
+    if (m.estado === 'terminada') {
+      estado.content += '\n\nEquipo terminado.';
+      let inf = '## Informe\n' + (m.informe || '');
+      if (m.acciones.length) inf += `\n\n(${m.acciones.length} acción(es) para aprobar en “Esperan tu aprobación”.)`;
+      h.push({ role: 'assistant', content: inf });
+      cargarAcciones(); cargarHistorial();
+      if (agenteAbierto === agenteId) pintarChat();
+      return;
+    }
+    if (m.estado === 'error') {
+      estado.content += '\n\nNo se pudo terminar: ' + (m.error || 'error desconocido');
+      if (agenteAbierto === agenteId) pintarChat();
+      return;
+    }
+    if (agenteAbierto === agenteId) pintarChat();
+  }
 }
 
 /* ---------- misiones ---------- */
@@ -260,3 +293,21 @@ $('chatTxt').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.prev
 setInterval(() => { if (KEY && !document.hidden) { cargarOficina().catch(() => {}); } }, 20000);
 
 if (KEY) iniciar(); else $('login').style.display = 'block';
+
+/* ---------- instalar como app ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw-oficina.js').catch(() => {}));
+}
+let pedidoInstalar = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); pedidoInstalar = e;
+  $('instalarApp').style.display = ''; $('sepInstalar').style.display = '';
+});
+$('instalarApp').onclick = async (e) => {
+  e.preventDefault();
+  if (!pedidoInstalar) return;
+  pedidoInstalar.prompt();
+  await pedidoInstalar.userChoice.catch(() => {});
+  pedidoInstalar = null; $('instalarApp').style.display = 'none'; $('sepInstalar').style.display = 'none';
+};
+window.addEventListener('appinstalled', () => { $('instalarApp').style.display = 'none'; $('sepInstalar').style.display = 'none'; });

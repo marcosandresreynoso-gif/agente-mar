@@ -3,12 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Oficina MARTOKEN</title>
+  <title>Oficina Martoken</title>
+  <link rel="manifest" href="/manifest-oficina.webmanifest" />
+  <meta name="theme-color" content="#0c0e12" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Oficina Martoken" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/oficina-192.png" />
+  <link rel="apple-touch-icon" href="/icons/oficina-apple-180.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <style>
     :root { --gold: #b8923f; --gold-soft: rgba(184, 146, 63, 0.14); --err: #ef6b6b; }
+    @media (display-mode: standalone) { header.bar { padding-top: env(safe-area-inset-top); } }
     .login-wrap { max-width: 360px; margin: 14vh auto; padding: 0 16px; }
     .btn { background: var(--gold); color: #1a1307; border: none; border-radius: 9px; padding: 9px 15px; font-weight: 700; cursor: pointer; font-size: 13px; }
     .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); font-weight: 600; }
@@ -90,11 +99,21 @@
     .chips { display: flex; gap: 6px; flex-wrap: wrap; }
     .chip { font-family: var(--mono); font-size: 11px; padding: 3px 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); }
     .chat-msgs { display: flex; flex-direction: column; gap: 10px; }
-    .msg { padding: 10px 12px; border-radius: 12px; font-size: 14px; max-width: 92%; }
+    .chat-msgs .msg { display: block; margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; max-width: 92%; }
     .msg.me { align-self: flex-end; background: var(--gold-soft); border: 1px solid rgba(184,146,63,.35); }
     .msg.ag { align-self: flex-start; background: var(--panel-2); border: 1px solid var(--line); }
     .chat-in { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
     .chat-in textarea { flex: 1; }
+    /* Celular: planta compacta en dos columnas */
+    @media (max-width: 600px) {
+      .planta { grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; }
+      .sala { padding: 8px; }
+      .sala h4 { font-size: 9.5px; letter-spacing: 1px; margin-bottom: 4px; }
+      .puesto { flex-direction: column; text-align: center; gap: 4px; padding: 6px 2px; }
+      .puesto .rl { font-size: 11px; line-height: 1.25; }
+      .puesto .st { display: none; }
+      .section-t .muted { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -102,9 +121,10 @@
   <div id="login" style="display:none;">
     <div class="login-wrap">
       <div class="logo" style="margin: 0 auto 16px;">M-AR</div>
-      <h2 style="text-align:center; margin:0 0 18px;">Oficina MARTOKEN</h2>
+      <h2 style="text-align:center; margin:0 0 18px;">Oficina Martoken</h2>
       <div class="field"><label>Contraseña del panel</label><input id="pass" type="password" /></div>
       <div id="loginMsg" class="muted"></div>
+      <label class="muted" style="display:flex; gap:8px; align-items:center; margin:6px 0 2px;"><input type="checkbox" id="recordar" checked /> Recordarme en este dispositivo</label>
       <button class="btn" style="width:100%; margin-top:8px;" id="loginBtn">Entrar</button>
     </div>
   </div>
@@ -114,8 +134,8 @@
     <header class="bar">
       <div class="bar-inner" style="max-width:1180px;">
         <div class="logo">M-AR</div>
-        <div><h1>Oficina MARTOKEN</h1><div class="sub">Tu equipo de agentes · <span id="estadoGral">cargando…</span></div></div>
-        <div class="status"><a href="/admin">Panel</a>&nbsp;·&nbsp;<a href="/whatsapp">WhatsApp</a>&nbsp;·&nbsp;<a href="#" id="logout">Salir</a></div>
+        <div><h1>Oficina Martoken</h1><div class="sub">Tu equipo de agentes · <span id="estadoGral">cargando…</span></div></div>
+        <div class="status"><a href="#" id="instalarApp" style="display:none; color:var(--gold); font-weight:600;">⬇ Instalar app</a><span id="sepInstalar" style="display:none">&nbsp;·&nbsp;</span><a href="/admin">Panel</a>&nbsp;·&nbsp;<a href="/whatsapp">WhatsApp</a>&nbsp;·&nbsp;<a href="#" id="logout">Salir</a></div>
       </div>
     </header>
 
