@@ -139,6 +139,7 @@ async function guardarFoco() {
 
 /* ---------- ficha y chat ---------- */
 function abrirFicha(id) {
+  ADJ.chat = []; pintarAdj('chat');
   const a = porId[id]; agenteAbierto = id;
   $('fAv').outerHTML = `<div class="avatar big" id="fAv" style="background:${a.color}">${esc(a.inicial)}</div>`;
   $('fNombre').textContent = a.nombre; $('fPuesto').textContent = `${a.puesto} · ${a.area}`;
@@ -173,14 +174,19 @@ function pintarChat() {
   $('fChat').scrollTop = $('fChat').scrollHeight;
 }
 async function enviarChat() {
-  const txt = $('chatTxt').value.trim(); if (!txt || !agenteAbierto) return;
+  const txt = $('chatTxt').value.trim(); if (!agenteAbierto) return;
+  const adj = adjListos('chat');
+  if (adj === null) { $('chatTxt').placeholder = 'Esperá a que termine de leer el archivo…'; return; }
+  if (!txt && !adj.length) return;
   const id = agenteAbierto; const h = chats[id] = chats[id] || [];
   const history = h.slice();
-  h.push({ role: 'user', content: txt }); $('chatTxt').value = ''; pintarChat();
+  const marca = adj.length ? `\n\n📎 Adjuntos: ${adj.map((a) => a.nombre).join(', ')}` : '';
+  h.push({ role: 'user', content: (txt || 'Te paso estos archivos con datos reales.') + marca });
+  $('chatTxt').value = ''; $('chatTxt').placeholder = 'Escribile…'; ADJ.chat = []; pintarAdj('chat'); pintarChat();
   $('msgs').insertAdjacentHTML('beforeend', '<div class="msg ag muted" id="pensando">Escribiendo…</div>');
   $('chatEnviar').disabled = true;
   try {
-    const r = await post('/api/admin/equipo/chat', { agente: id, message: txt, history });
+    const r = await post('/api/admin/equipo/chat', { agente: id, message: txt, history, adjuntos: adj.map((a) => a.id) });
     let c = r.reply;
     if (r.acciones && r.acciones.length) c += `\n\n(${r.acciones.length} acción(es) propuesta(s) enviadas a “Esperan tu aprobación”.)`;
     h.push({ role: 'assistant', content: c });
@@ -291,13 +297,70 @@ function descargarDia() {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+/* ---------- adjuntos: fotos y archivos con datos reales ---------- */
+const ADJ = { chat: [], mision: [] };
+const TIPO_ICONO = { imagen: '🖼️', pdf: '📄', excel: '📊', texto: '📝' };
+// Las fotos se achican en el teléfono antes de subirlas (más rápido y Groq las acepta)
+function achicarImagen(file, max = 1800) {
+  return new Promise((ok) => {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return ok(file);
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      if (k === 1 && file.size < 1.5e6) return ok(file);
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob((b) => ok(b ? new File([b], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file), 'image/jpeg', 0.88);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); ok(file); };
+    img.src = url;
+  });
+}
+function pintarAdj(donde) {
+  const cont = $(donde === 'chat' ? 'chatAdj' : 'misionAdj');
+  cont.innerHTML = ADJ[donde].map((a, i) => `<div class="adj ${a.error ? 'err' : ''}">
+    <div class="fila"><span>${a.subiendo ? '⏳' : a.error ? '⚠️' : (TIPO_ICONO[a.tipo] || '📎')}</span>
+      <span class="nom">${esc(a.nombre)}</span>
+      <span class="muted">${a.subiendo ? (a.tipo === 'imagen' ? 'leyendo la imagen…' : 'leyendo…') : a.error ? esc(a.error) : 'listo'}</span>
+      <span class="x" data-i="${i}" title="Quitar">✕</span></div>
+    ${a.texto ? `<details><summary>Ver lo que leyó el equipo (revisá que los números estén bien)</summary><pre>${esc(a.texto)}${a.largo > a.texto.length ? '\n…' : ''}</pre></details>` : ''}
+  </div>`).join('');
+  cont.querySelectorAll('.x').forEach((x) => x.onclick = () => { ADJ[donde].splice(+x.dataset.i, 1); pintarAdj(donde); });
+}
+async function subirAdjuntos(donde, files) {
+  for (const f0 of Array.from(files || [])) {
+    if (ADJ[donde].filter((a) => !a.error).length >= 5) { alertaAdj(donde, 'Máximo 5 archivos por mensaje.'); break; }
+    const a = { nombre: f0.name, tipo: /^image\//.test(f0.type) ? 'imagen' : '', subiendo: true };
+    ADJ[donde].push(a); pintarAdj(donde);
+    try {
+      const f = await achicarImagen(f0);
+      const fd = new FormData(); fd.append('archivo', f, f.name);
+      const res = await fetch('/api/admin/equipo/adjunto', { method: 'POST', headers: { 'x-admin-key': KEY }, body: fd });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || `Error ${res.status}`);
+      Object.assign(a, { id: d.id, nombre: d.nombre, tipo: d.tipo, texto: d.texto, largo: d.largo });
+    } catch (e) { a.error = e.message; }
+    a.subiendo = false; pintarAdj(donde);
+  }
+}
+function alertaAdj(donde, txt) { const a = { nombre: txt, error: ' ' }; ADJ[donde].push(a); pintarAdj(donde); setTimeout(() => { ADJ[donde] = ADJ[donde].filter((x) => x !== a); pintarAdj(donde); }, 4000); }
+// Devuelve los adjuntos listos (o null si alguno todavía se está leyendo)
+function adjListos(donde) {
+  if (ADJ[donde].some((a) => a.subiendo)) return null;
+  return ADJ[donde].filter((a) => a.id);
+}
+
 /* ---------- misiones ---------- */
 async function encargar() {
-  const pedido = $('pedido').value.trim(); if (!pedido) return;
+  const pedido = $('pedido').value.trim();
+  const adj = adjListos('mision');
+  if (adj === null) { $('misionMsg').textContent = 'Esperá a que termine de leer los archivos…'; return; }
+  if (!pedido && !adj.length) return;
   $('btnMision').disabled = true; $('misionMsg').textContent = 'Enviando a la Directora…';
   try {
-    const r = await post('/api/admin/equipo/mision', { pedido });
-    $('pedido').value = ''; $('misionMsg').textContent = '';
+    const r = await post('/api/admin/equipo/mision', { pedido, adjuntos: adj.map((a) => a.id) });
+    $('pedido').value = ''; $('misionMsg').textContent = ''; ADJ.mision = []; pintarAdj('mision');
     verMision(r.id); cargarHistorial();
   } catch (e) { $('misionMsg').textContent = e.message; }
   $('btnMision').disabled = false;
@@ -409,6 +472,8 @@ $('pedido').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKe
 $('fCerrar').onclick = cerrarFicha; $('fichaBg').onclick = cerrarFicha;
 document.querySelectorAll('.ftab').forEach((t) => t.onclick = () => tab(t.dataset.t));
 $('chatEnviar').onclick = enviarChat;
+$('chatArch').onchange = (e) => { subirAdjuntos('chat', e.target.files); e.target.value = ''; };
+$('misionArch').onchange = (e) => { subirAdjuntos('mision', e.target.files); e.target.value = ''; };
 $('chatDia').onchange = cambiarDia;
 $('chatBajar').onclick = descargarDia;
 $('chatTxt').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarChat(); } };

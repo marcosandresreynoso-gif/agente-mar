@@ -1,7 +1,7 @@
 // sw-oficina.js — permite instalar la Oficina como app y abrirla aunque falle la conexión.
 // Siempre intenta traer lo último de la red; si no hay red, muestra la última copia guardada.
 // Los datos (/api/...) nunca se guardan: siempre vienen en vivo del servidor.
-const CACHE = 'oficina-v1';
+const CACHE = 'oficina-v2';
 const BASE = ['/oficina', '/oficina.js', '/styles.css', '/manifest-oficina.webmanifest', '/icons/oficina-192.png', '/icons/oficina-512.png'];
 
 self.addEventListener('install', (e) => {

@@ -14,6 +14,7 @@ const report = require('./src/report');
 const whatsapp = require('./src/whatsapp');
 const { notifyEmail } = require('./src/notify');
 const equipo = require('./src/equipo');
+const adjuntos = require('./src/adjuntos');
 
 initDb();
 equipo.initEquipo();
@@ -451,18 +452,36 @@ app.post('/api/admin/equipo/foco', requireAdmin, (req, res) => {
 
 app.post('/api/admin/equipo/chat', requireAdmin, async (req, res) => {
   try {
-    const { agente, message, history } = req.body || {};
-    if (!message || !String(message).trim()) return res.status(400).json({ error: 'Mensaje vacío.' });
-    res.json(await equipo.chatConAgente({ agente, message, history: Array.isArray(history) ? history : [] }));
+    const { agente, history } = req.body || {};
+    const adjuntos = Array.isArray((req.body || {}).adjuntos) ? req.body.adjuntos : [];
+    let message = String((req.body || {}).message || '').trim();
+    if (!message && adjuntos.length) message = 'Te paso estos archivos con datos reales. Analizalos y decime qué ves y qué recomendás.';
+    if (!message) return res.status(400).json({ error: 'Mensaje vacío.' });
+    res.json(await equipo.chatConAgente({ agente, message, history: Array.isArray(history) ? history : [], adjuntos }));
   } catch (e) {
     console.error('[/api/admin/equipo/chat] ERROR:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
+// Fotos y archivos para los agentes: se lee el contenido y se devuelve el id para mandarlo con el mensaje
+app.post('/api/admin/equipo/adjunto', requireAdmin, (req, res) => {
+  upload.single('archivo')(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'El archivo pesa más de 15 MB.' : err.message });
+    try {
+      const a = await adjuntos.procesarAdjunto(req.file);
+      res.json({ ok: true, id: a.id, nombre: a.nombre, tipo: a.tipo, texto: a.texto.slice(0, 3000), largo: a.texto.length });
+    } catch (e) {
+      console.error('[/api/admin/equipo/adjunto]', e.message);
+      res.status(400).json({ error: e.message });
+    }
+  });
+});
+
 app.post('/api/admin/equipo/mision', requireAdmin, (req, res) => {
   try {
-    res.json({ ok: true, id: equipo.crearMision((req.body || {}).pedido) });
+    const b = req.body || {};
+    res.json({ ok: true, id: equipo.crearMision(b.pedido, Array.isArray(b.adjuntos) ? b.adjuntos : []) });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

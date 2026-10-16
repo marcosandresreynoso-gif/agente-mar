@@ -13,6 +13,7 @@ const { db, getConfig, setConfig } = require('./db');
 const { complete, cantidadKeys, buscarWeb, recortar } = require('./groq');
 const rag = require('./rag');
 const { controlarYAnotar } = require('./control');
+const { initAdjuntos, obtenerAdjuntos, bloqueAdjuntos } = require('./adjuntos');
 
 const now = () => new Date().toISOString();
 
@@ -244,6 +245,8 @@ function initEquipo() {
     CREATE INDEX IF NOT EXISTS idx_eq_chat_dia ON eq_chat(dia, agente, id);
   `);
   try { db.exec('ALTER TABLE eq_misiones ADD COLUMN investigacion TEXT'); } catch (e) { /* ya existe */ }
+  try { db.exec('ALTER TABLE eq_misiones ADD COLUMN adjuntos TEXT'); } catch (e) { /* ya existe */ }
+  initAdjuntos();
 }
 
 /* ============================ DATOS PARA CADA AGENTE ============================ */
@@ -286,7 +289,7 @@ const REGLAS_COMUNES =
   '- MAR-50: NUNCA pongas la cantidad de viviendas (nada de "50 viviendas"), ni monto de la emisión, ni porcentaje de renta, ni "en General Villegas".\n' +
   '- ORGANIZACIONES Y EMPRESAS: nombrá solo las que estén en la documentación o en la investigación web con su URL. Si sugerís otras, escribí el tipo ("cooperativas eléctricas de la zona") y no inventes nombres propios. Si nombrás una sin fuente, marcala "(a verificar)".\n' +
   '- Zona: salvo que Marcos pida otra cosa, priorizá General Villegas y el oeste bonaerense (la región de MARTOKEN) antes que ciudades lejanas.\n' +
-  '- DATOS: NUNCA afirmes resultados, métricas o situaciones (CPL, clics, leads, preinscriptos, ventas, "la campaña está funcionando") que Marcos no informó y que no están en DATOS ACTUALES DEL SISTEMA. Si no hay datos, escribí "sin datos todavía" y pedí cuáles necesitás.\n' +
+  '- DATOS: NUNCA afirmes resultados, métricas o situaciones (CPL, clics, leads, preinscriptos, ventas, "la campaña está funcionando") que Marcos no informó y que no están en DATOS ACTUALES DEL SISTEMA ni en ARCHIVOS ADJUNTOS DE MARCOS. Los adjuntos son datos reales: usalos y citá sus números tal cual, sin redondear ni completar lo que no figura. Si no hay datos, escribí "sin datos todavía" y pedí cuáles necesitás.\n' +
   '- PRESUPUESTO: no propongas montos de publicidad ni gastos concretos si Marcos no dio su presupuesto. Pedíselo, o proponé cómo repartir el que tenga.\n' +
   '- FUERA DE ARGENTINA: toda publicidad, captación u oferta de tokens a personas de otros países (EE.UU., España, etc.) se marca "⚖️ REQUIERE CONSULTA LEGAL PREVIA". En EE.UU., ofrecer tokens de inversión al público puede ser oferta de valores regulada por la SEC. No lo propongas como algo para hacer ya.\n' +
   '- No propongas pedir difusión a empresas competidoras (plataformas de inversión inmobiliaria o cripto) ni a gobiernos extranjeros. No nombres empresas sin verificar que existan y sigan activas.\n' +
@@ -377,24 +380,26 @@ function restaurarChat(dia, agente, mensajes) {
 }
 
 /* ============================ CHAT DIRECTO CON UN AGENTE ============================ */
-async function chatConAgente({ agente, message, history = [] }) {
+async function chatConAgente({ agente, message, history = [], adjuntos = [] }) {
   if (!AGENTES[agente]) throw new Error('Ese agente no existe.');
+  const adj = obtenerAdjuntos(adjuntos);
+  const marcaAdj = adj.length ? `\n\n📎 Adjuntos: ${adj.map((a) => a.nombre).join(', ')}` : '';
   // Victoria (Directora): si le pedís un trabajo, arma una misión y la reparte al equipo.
   // Saludos o mensajes muy cortos los contesta ella sola.
-  if (agente === 'directora' && String(message).trim().length >= 20) {
+  if (agente === 'directora' && (String(message).trim().length >= 20 || adj.length)) {
     const previos = history.filter((h) => h.role === 'user').slice(-2).map((h) => String(h.content || '').slice(0, 800));
     const pedido = (previos.length ? `Contexto de lo que Marcos venía hablando: ${previos.join(' / ')}\n\n` : '') + String(message).slice(0, 2500);
-    const id = crearMision(pedido);
+    const id = crearMision(pedido, adj.map((a) => a.id));
     const respuesta = 'Recibido. Armo la misión y la reparto al equipo. Te voy contando acá quién trabaja en qué y, cuando terminen, te dejo el informe en este chat.';
-    guardarChat(agente, 'user', message); guardarChat(agente, 'assistant', respuesta);
+    guardarChat(agente, 'user', message + marcaAdj); guardarChat(agente, 'assistant', respuesta);
     return {
-      reply: 'Recibido. Armo la misión y la reparto al equipo. Te voy contando acá quién trabaja en qué y, cuando terminen, te dejo el informe en este chat.',
+      reply: respuesta,
       acciones: [],
       mision_id: id
     };
   }
   const hist = history.slice(-6).map((h) => `${h.role === 'user' ? 'Marcos' : AGENTES[agente].nombre}: ${String(h.content || '').slice(0, 1500)}`).join('\n');
-  const user = (hist ? `Conversación hasta ahora:\n${hist}\n\n` : '') + `Marcos: ${String(message).slice(0, 4000)}`;
+  const user = (hist ? `Conversación hasta ahora:\n${hist}\n\n` : '') + `Marcos: ${String(message).slice(0, 4000)}` + bloqueAdjuntos(adj, 7000, recortar);
   const investigacion = NECESITA_BUSQUEDA.test(message) ? await buscarWeb(`${message}\n(Contexto: MARTOKEN, tokenización inmobiliaria en Argentina, fideicomiso, tokens en Polygon.)`) : '';
   const out = await complete(promptAgente(agente, message, investigacion), user, { maxTokens: 1000, temperature: 0.4, maxEsperaMs: 45000 });
   const sep = separarAcciones(out);
@@ -402,12 +407,12 @@ async function chatConAgente({ agente, message, history = [] }) {
   // Las acciones que propone en el chat también quedan para aprobar
   const ins = db.prepare('INSERT INTO eq_acciones (created_at, mision_id, agente, descripcion) VALUES (?,?,?,?)');
   for (const ac of acciones) ins.run(now(), null, agente, ac);
-  guardarChat(agente, 'user', message); guardarChat(agente, 'assistant', texto);
+  guardarChat(agente, 'user', message + marcaAdj); guardarChat(agente, 'assistant', texto);
   return { reply: texto, acciones };
 }
 
 /* ============================ MISIONES ============================ */
-async function planificar(pedido) {
+async function planificar(pedido, adjTexto = '') {
   const equipo = ORDEN.filter((id) => id !== 'directora')
     .map((id) => `- ${id}: ${AGENTES[id].nombre}, ${AGENTES[id].puesto}. Hace: ${AGENTES[id].responsabilidades.join('; ')}`)
     .join('\n');
@@ -418,7 +423,7 @@ async function planificar(pedido) {
     'Respondé SOLO un JSON con esta forma: {"resumen":"qué vas a hacer en 1 frase","tareas":[{"agente":"id","tarea":"instrucción concreta"}]}\n' +
     'Reglas: entre 1 y 4 tareas, solo los agentes necesarios, en orden lógico (los que dependen de otros van después). ' +
     'Usá exactamente los id de la lista.';
-  const raw = await complete(sys, pedido, { json: true, maxTokens: 500, maxEsperaMs: 90000 });
+  const raw = await complete(sys, pedido + adjTexto, { json: true, maxTokens: 500, maxEsperaMs: 90000 });
   let plan;
   try { plan = JSON.parse(raw); } catch (e) { plan = null; }
   let tareas = (plan && Array.isArray(plan.tareas) ? plan.tareas : [])
@@ -441,7 +446,9 @@ async function ejecutarMision(misionId) {
     db.prepare(`UPDATE eq_misiones SET ${keys.map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`).run({ ...campos, id: misionId });
   };
   try {
-    const plan = await planificar(m.pedido);
+    let adj = [];
+    try { adj = obtenerAdjuntos(JSON.parse(m.adjuntos || '[]')); } catch (e) { adj = []; }
+    const plan = await planificar(m.pedido, bloqueAdjuntos(adj, 2500, recortar));
     const insT = db.prepare('INSERT INTO eq_tareas (mision_id, orden, agente, tarea) VALUES (?,?,?,?)');
     plan.tareas.forEach((t, i) => insT.run(misionId, i + 1, t.agente, String(t.tarea).slice(0, 1000)));
     let investigacion = '';
@@ -470,7 +477,7 @@ async function ejecutarMision(misionId) {
       // Hasta 2 intentos: el segundo con menos contexto y después de una pausa
       for (const intento of [1, 2]) {
         try {
-          const user = `Pedido original de Marcos: ${m.pedido}\n\nTu tarea: ${t.tarea}${contextoPrevio(hechos, intento === 1 ? 9000 : 3500)}`;
+          const user = `Pedido original de Marcos: ${m.pedido}${bloqueAdjuntos(adj, intento === 1 ? 6000 : 3000, recortar)}\n\nTu tarea: ${t.tarea}${contextoPrevio(hechos, intento === 1 ? (adj.length ? 6000 : 9000) : 3500)}`;
           const inv = intento === 1 ? investigacion : recortar(investigacion, 2000);
           const out = await complete(promptAgente(t.agente, `${m.pedido} ${t.tarea}`, inv), user, { maxTokens: 1100, temperature: 0.4, maxEsperaMs: 90000 });
           if (!out || !out.trim()) throw new Error('respuesta vacía');
@@ -507,7 +514,7 @@ async function ejecutarMision(misionId) {
         'PROHIBIDO inventar resultados, métricas o situaciones (CPL, leads, inscriptos, ventas, "la campaña está generando…"): ' +
         'usá SOLO lo que dijo Marcos en su pedido y lo que hizo el equipo. Si faltan datos, decilo y pedilos.' +
         (fallidas.length ? `\nIMPORTANTE: ${fallidas.join(', ')} no pudo/pudieron completar su tarea. Decilo claramente en el informe.` : '');
-      const user = `Pedido: ${m.pedido}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${recortar(h.texto, Math.floor(9000 / hechos.length))}`).join('\n\n');
+      const user = `Pedido: ${m.pedido}${bloqueAdjuntos(adj, 2500, recortar)}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${recortar(h.texto, Math.floor(9000 / hechos.length))}`).join('\n\n');
       try {
         informe = controlarYAnotar(separarAcciones(await complete(sys, user, { maxTokens: 800, temperature: 0.3, maxEsperaMs: 90000 })).texto) + avisoFallas;
       } catch (e) {
@@ -525,12 +532,15 @@ async function ejecutarMision(misionId) {
   }
 }
 
-function crearMision(pedido) {
-  const texto = String(pedido || '').trim().slice(0, 3000);
+function crearMision(pedido, adjuntos = []) {
+  const adj = obtenerAdjuntos(adjuntos);
+  let texto = String(pedido || '').trim().slice(0, 3000);
+  if (!texto && adj.length) texto = 'Analizá los archivos adjuntos y decime qué conclusiones y próximos pasos sacás para MAR-50.';
+  if (adj.length) texto += `\n\n📎 Adjuntos: ${adj.map((a) => a.nombre).join(', ')}`;
   if (!texto) throw new Error('Escribí qué necesitás.');
   const enCurso = db.prepare(`SELECT COUNT(*) n FROM eq_misiones WHERE estado IN ('planificando','trabajando')`).get().n;
   if (enCurso >= 2) throw new Error('Ya hay 2 misiones en curso. Esperá a que termine alguna.');
-  const id = db.prepare('INSERT INTO eq_misiones (created_at, pedido) VALUES (?,?)').run(now(), texto).lastInsertRowid;
+  const id = db.prepare('INSERT INTO eq_misiones (created_at, pedido, adjuntos) VALUES (?,?,?)').run(now(), texto, JSON.stringify(adj.map((a) => a.id))).lastInsertRowid;
   // Corre en segundo plano; el panel consulta el estado cada pocos segundos
   setImmediate(() => ejecutarMision(id));
   return id;

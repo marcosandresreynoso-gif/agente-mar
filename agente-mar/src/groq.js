@@ -299,4 +299,46 @@ async function buscarWeb(pregunta, { maxEsperaMs = 60000 } = {}) {
   }
 }
 
-module.exports = { chat, complete, MODULOS, cantidadKeys, buscarWeb, verificarFuentes, recortar };
+// Lee una foto o captura (Meta Ads, planillas, WhatsApp, etc.) con el modelo de visión de Groq
+// y devuelve TODO lo que se ve, en texto, para que los agentes trabajen con datos reales.
+const MODELO_VISION = process.env.GROQ_MODEL_VISION || 'qwen/qwen3.8-27b';
+const MODELO_VISION_RESPALDO = process.env.GROQ_MODEL_VISION_2 || 'meta-llama/llama-4-scout-17b-16e-instruct';
+async function leerImagen(dataUrl, nombre = 'imagen') {
+  const body = {
+    model: MODELO_VISION,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text:
+          `Esta imagen ("${nombre}") la subió Marcos, fundador de MARTOKEN, para que su equipo trabaje con datos reales. ` +
+          'Transcribí en español TODO lo que se ve: títulos, nombres de campañas, fechas, períodos y cada número con su etiqueta ' +
+          '(alcance, impresiones, clics, CTR, costo, CPL, resultados, preinscriptos, montos, etc.). ' +
+          'Si hay una tabla, pasala fila por fila en líneas "etiqueta: valor". Si hay un gráfico, describí la tendencia y los valores visibles. ' +
+          'Copiá los números EXACTAMENTE como aparecen. Si algo no se lee bien, escribí "(ilegible)". ' +
+          'No interpretes, no opines y no agregues nada que no esté en la imagen.' },
+        { type: 'image_url', image_url: { url: dataUrl } }
+      ]
+    }],
+    temperature: 0.1,
+    max_tokens: 2500
+  };
+  let res = await fetchGroq(body, { maxEsperaMs: 60000 });
+  if (!res.ok && (res.status === 404 || res.status === 400) && MODELO_VISION_RESPALDO !== body.model) {
+    // Si Groq dio de baja o no habilita el modelo, se prueba con el de respaldo
+    console.warn('[leerImagen] modelo', body.model, 'falló (', res.status, '): pruebo', MODELO_VISION_RESPALDO, (await res.text().catch(() => '')).slice(0, 200));
+    body.model = MODELO_VISION_RESPALDO;
+    res = await fetchGroq(body, { maxEsperaMs: 60000 });
+  }
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    console.error('[leerImagen] Groq', res.status, t.slice(0, 300));
+    throw new Error(res.status === 413
+      ? 'La imagen es muy pesada. Probá con una captura más chica.'
+      : `No se pudo leer la imagen (Groq ${res.status}).`);
+  }
+  const data = await res.json();
+  // Algunos modelos escriben su razonamiento entre <think>…</think>: se descarta
+  return String(data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+}
+
+module.exports = { chat, complete, MODULOS, cantidadKeys, buscarWeb, verificarFuentes, recortar, leerImagen };
