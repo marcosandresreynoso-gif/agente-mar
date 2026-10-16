@@ -6,6 +6,9 @@ const SITIO = 'martoken.com.ar';
 
 // Correcciones automáticas: [patrón, reemplazo, descripción]
 const CORRECCIONES = [
+  // Errores de escritura que ya aparecieron en informes
+  [/\bfideicomicio(s?)\b/gi, (m, s) => (m[0] === 'F' ? 'Fideicomiso' : 'fideicomiso') + s, 'fideicomicio → fideicomiso'],
+  [/\bse escribe una sola vez\b/gi, () => 'se escritura una sola vez', '"se escribe" → "se escritura"'],
   // Dominio mal escrito: martoken.com.au, martoken.com, martoken.ar, martoken.com.ar.ar, martokn.com.ar, etc.
   [/\b(?:www\.)?mar\s?tok[e]?n\.(?:com\.(?!ar\b)[a-z]{2,3}|com(?!\.ar)|ar|net|org|io)\b/gi, () => SITIO, 'página web mal escrita → martoken.com.ar'],
   [/\bmartokn\.com\.ar\b/gi, () => SITIO, 'página web mal escrita → martoken.com.ar'],
