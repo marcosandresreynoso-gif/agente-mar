@@ -535,7 +535,11 @@ async function ejecutarMision(misionId) {
     } else if (hechos.length === 1) {
       informe = hechos[0].texto + avisoFallas;
     } else {
-      throw new Error('Ningún agente pudo completar su tarea. Probá de nuevo en unos minutos.');
+      const det = db.prepare(`SELECT resultado FROM eq_tareas WHERE mision_id = ? AND estado = 'error' ORDER BY orden DESC LIMIT 1`).get(misionId);
+      const motivo = ((det && det.resultado) || '').split('Detalle técnico: ')[1] || '';
+      throw new Error(/cupo diario/i.test(motivo)
+        ? 'Ningún agente pudo trabajar: se terminó el cupo diario gratis de Groq. Se renueva solo; probá en unas horas.'
+        : 'Ningún agente pudo completar su tarea. Probá de nuevo en unos minutos.' + (motivo ? ` (Motivo: ${motivo.slice(0, 200)})` : ''));
     }
     upd({ estado: 'terminada', informe, finished_at: now() });
   } catch (e) {
