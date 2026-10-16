@@ -10,7 +10,7 @@
 // pagar, firmar). Solo las PROPONEN y quedan pendientes hasta que Marcos las aprueba en el panel.
 
 const { db, getConfig, setConfig } = require('./db');
-const { complete, cantidadKeys } = require('./groq');
+const { complete, cantidadKeys, buscarWeb } = require('./groq');
 const rag = require('./rag');
 
 const now = () => new Date().toISOString();
@@ -242,6 +242,7 @@ function initEquipo() {
     );
     CREATE INDEX IF NOT EXISTS idx_eq_chat_dia ON eq_chat(dia, agente, id);
   `);
+  try { db.exec('ALTER TABLE eq_misiones ADD COLUMN investigacion TEXT'); } catch (e) { /* ya existe */ }
 }
 
 /* ============================ DATOS PARA CADA AGENTE ============================ */
@@ -281,6 +282,7 @@ const REGLAS_COMUNES =
   '- Español rioplatense, directo y sin relleno. Usá títulos cortos y viñetas cuando ayuden.\n' +
   '- NO uses tablas: Marcos lee desde el celular. Presentá todo en listas o párrafos cortos, uno debajo del otro.\n' +
   '- Trabajás en ARGENTINA. El organismo fiscal es ARCA (ex AFIP). No uses impuestos ni normas de otros países (por ejemplo "ITP" es de España).\n' +
+  '- Si recibís una "INVESTIGACIÓN WEB", usala para datos actuales y citá la fuente (URL) de cada dato que tomes de ahí. Si un dato no está ni en la documentación ni en la investigación, decí que no lo encontraste: no lo inventes.\n' +
   '- NUNCA cites números de ley, artículos, resoluciones ni alícuotas que no estén en la documentación. Si no estás seguro, escribí "(a verificar con contador/abogado)". Inventar una norma es el peor error posible.\n' +
   '- Si revisás el trabajo de un compañero, revisá TODO lo que hizo. Si algo no lo recibiste completo, decilo; no lo supongas.\n' +
   '- IMPUESTOS: cuando el tema sea impositivo, usá SOLO la "GUÍA IMPOSITIVA VERIFICADA". Explicá con claridad las ventajas que ahí figuran; no agregues otras ni afirmes lo que la guía marca como falso o A CONFIRMAR. Cerrá con: "Información general. Consultá tu caso con tu contador."\n' +
@@ -300,9 +302,11 @@ function guiaImpuestos() {
   }
   return GUIA_IMPUESTOS;
 }
+// Temas que necesitan datos actuales: el equipo busca en internet antes de trabajar
+const NECESITA_BUSQUEDA = /impuest|imposit|fiscal|tribut|arca|afip|ganancia|bienes personales|sellos|ley|norma|decreto|resoluci|cnv|regula|legal|mercado|competen|precio|tasa|d[oó]lar|inflaci|alquiler|tendencia|estad[ií]stica|actual|hoy|202[5-9]|noticia|buscá|busca|investig/i;
 const ES_IMPOSITIVO = /impuest|imposit|fiscal|tribut|arca|afip|ganancia|bienes personales|sellos|escritur|inocencia|exenci|declara/i;
 
-function promptAgente(id, consulta) {
+function promptAgente(id, consulta, investigacion = '') {
   const a = AGENTES[id];
   const foco = getFoco();
   let contexto = '';
@@ -313,6 +317,7 @@ function promptAgente(id, consulta) {
     `Tu jefe es Marcos Reynoso, fundador y fiduciario.\n${a.prompt}\n\n` +
     `FOCO ACTUAL DEL EQUIPO (tiene prioridad; todo tu trabajo apunta a esto salvo que Marcos pida otra cosa):\n${foco}\n\n${REGLAS_COMUNES}\n`;
   if (datos) s += `\nDATOS ACTUALES DEL SISTEMA:\n${datos}\n`;
+  if (investigacion) s += `\nINVESTIGACIÓN WEB (hecha hoy, con fuentes):\n"""\n${investigacion.slice(0, 6000)}\n"""\n`;
   if (ES_IMPOSITIVO.test(consulta) && guiaImpuestos()) s += `\nGUÍA IMPOSITIVA VERIFICADA (única fuente válida para impuestos):\n"""\n${guiaImpuestos()}\n"""\n`;
   if (contexto && contexto.trim()) s += `\nDOCUMENTACIÓN DE MARTOKEN (fuente principal):\n"""\n${contexto}\n"""\n`;
   return s;
@@ -375,7 +380,8 @@ async function chatConAgente({ agente, message, history = [] }) {
   }
   const hist = history.slice(-6).map((h) => `${h.role === 'user' ? 'Marcos' : AGENTES[agente].nombre}: ${String(h.content || '').slice(0, 1500)}`).join('\n');
   const user = (hist ? `Conversación hasta ahora:\n${hist}\n\n` : '') + `Marcos: ${String(message).slice(0, 4000)}`;
-  const out = await complete(promptAgente(agente, message), user, { maxTokens: 1000, temperature: 0.4, maxEsperaMs: 45000 });
+  const investigacion = NECESITA_BUSQUEDA.test(message) ? await buscarWeb(`${message}\n(Contexto: MARTOKEN, tokenización inmobiliaria en Argentina, fideicomiso, tokens en Polygon.)`) : '';
+  const out = await complete(promptAgente(agente, message, investigacion), user, { maxTokens: 1000, temperature: 0.4, maxEsperaMs: 45000 });
   const { texto, acciones } = separarAcciones(out);
   // Las acciones que propone en el chat también quedan para aprobar
   const ins = db.prepare('INSERT INTO eq_acciones (created_at, mision_id, agente, descripcion) VALUES (?,?,?,?)');
@@ -417,7 +423,12 @@ async function ejecutarMision(misionId) {
     const plan = await planificar(m.pedido);
     const insT = db.prepare('INSERT INTO eq_tareas (mision_id, orden, agente, tarea) VALUES (?,?,?,?)');
     plan.tareas.forEach((t, i) => insT.run(misionId, i + 1, t.agente, String(t.tarea).slice(0, 1000)));
-    upd({ estado: 'trabajando', resumen_plan: plan.resumen });
+    let investigacion = '';
+    if (NECESITA_BUSQUEDA.test(m.pedido)) {
+      upd({ estado: 'trabajando', resumen_plan: plan.resumen + ' (investigando en internet…)' });
+      investigacion = await buscarWeb(`${m.pedido}\n(Contexto: MARTOKEN, tokenización inmobiliaria en Argentina, fideicomiso, tokens en Polygon. Buscá los datos actuales que el equipo necesita.)`, { maxEsperaMs: 90000 });
+    }
+    upd({ estado: 'trabajando', resumen_plan: plan.resumen, investigacion: investigacion || null });
 
     const tareas = db.prepare('SELECT * FROM eq_tareas WHERE mision_id = ? ORDER BY orden').all(misionId);
     const hechos = [];
@@ -430,7 +441,7 @@ async function ejecutarMision(misionId) {
           ? '\n\nLo que ya hicieron tus compañeros en esta misión:\n' + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 5000)}`).join('\n\n')
           : '';
         const user = `Pedido original de Marcos: ${m.pedido}\n\nTu tarea: ${t.tarea}${previo}`;
-        const out = await complete(promptAgente(t.agente, `${m.pedido} ${t.tarea}`), user, { maxTokens: 1100, temperature: 0.4, maxEsperaMs: 90000 });
+        const out = await complete(promptAgente(t.agente, `${m.pedido} ${t.tarea}`, investigacion), user, { maxTokens: 1100, temperature: 0.4, maxEsperaMs: 90000 });
         const { texto, acciones } = separarAcciones(out);
         for (const ac of acciones) insA.run(now(), misionId, t.agente, ac);
         db.prepare('UPDATE eq_tareas SET estado = ?, resultado = ?, finished_at = ? WHERE id = ?').run('lista', texto, now(), t.id);
@@ -443,7 +454,7 @@ async function ejecutarMision(misionId) {
     // Informe final de la Directora
     let informe = '';
     if (hechos.length > 1) {
-      const sys = promptAgente('directora', m.pedido) +
+      const sys = promptAgente('directora', m.pedido, investigacion) +
         '\nAhora escribí el INFORME FINAL para Marcos: conclusión en 2-3 líneas, lo más importante de cada área, ' +
         'y próximos pasos numerados. Máximo 300 palabras. No repitas todo: sintetizá. No incluyas sección de acciones propuestas.';
       const user = `Pedido: ${m.pedido}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 3000)}`).join('\n\n');
