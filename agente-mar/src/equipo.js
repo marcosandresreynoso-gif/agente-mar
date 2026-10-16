@@ -122,7 +122,9 @@ const AGENTES = {
     prompt:
       'Sos el responsable de Marketing y Contenido de MARTOKEN. Tu prioridad es llenar la preinscripción de MAR-50: escribís ' +
       'publicaciones y anuncios para Facebook e Instagram en español rioplatense, con gancho, claridad y una sola llamada a la acción ' +
-      '(preinscribirse en https://www.martoken.com.ar/#mar50). Respetás que no se puede prometer rentabilidad garantizada.'
+      '(preinscribirse en https://www.martoken.com.ar/#mar50). Respetás que no se puede prometer rentabilidad garantizada. ' +
+      'Identidad MARTOKEN: colores marino #0B1D3B, dorado #B8923F y crema #F4F1E9; tipografías Fraunces (títulos) e Inter (textos). ' +
+      'Eslogan: "Con MARTOKEN primero la demanda. Después la inversión." Tono humilde, sin parecer una gran empresa. Los anuncios siempre llevan a martoken.com.ar.'
   },
   legal: {
     nombre: 'Martina',
@@ -278,6 +280,10 @@ const REGLAS_COMUNES =
   'Reglas del equipo:\n' +
   '- Español rioplatense, directo y sin relleno. Usá títulos cortos y viñetas cuando ayuden.\n' +
   '- NO uses tablas: Marcos lee desde el celular. Presentá todo en listas o párrafos cortos, uno debajo del otro.\n' +
+  '- Trabajás en ARGENTINA. El organismo fiscal es ARCA (ex AFIP). No uses impuestos ni normas de otros países (por ejemplo "ITP" es de España).\n' +
+  '- NUNCA cites números de ley, artículos, resoluciones ni alícuotas que no estén en la documentación. Si no estás seguro, escribí "(a verificar con contador/abogado)". Inventar una norma es el peor error posible.\n' +
+  '- Si revisás el trabajo de un compañero, revisá TODO lo que hizo. Si algo no lo recibiste completo, decilo; no lo supongas.\n' +
+  '- Hoy NO hay beneficios impositivos confirmados para invertir en MARTOKEN. No afirmes exenciones ni que se pagan menos impuestos.\n' +
   '- No inventes datos: si algo no está en la documentación ni en los datos, decilo y sugerí cómo conseguirlo.\n' +
   '- NUNCA ejecutás acciones externas (enviar mensajes, publicar, pagar, firmar, lanzar campañas). ' +
   'Si hace falta una, la proponés al final para que Marcos la apruebe.\n' +
@@ -409,7 +415,7 @@ async function ejecutarMision(misionId) {
       db.prepare('UPDATE eq_tareas SET estado = ?, started_at = ? WHERE id = ?').run('trabajando', now(), t.id);
       try {
         const previo = hechos.length
-          ? '\n\nLo que ya hicieron tus compañeros en esta misión:\n' + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 1000)}`).join('\n\n')
+          ? '\n\nLo que ya hicieron tus compañeros en esta misión:\n' + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 5000)}`).join('\n\n')
           : '';
         const user = `Pedido original de Marcos: ${m.pedido}\n\nTu tarea: ${t.tarea}${previo}`;
         const out = await complete(promptAgente(t.agente, `${m.pedido} ${t.tarea}`), user, { maxTokens: 1100, temperature: 0.4, maxEsperaMs: 90000 });
@@ -428,7 +434,7 @@ async function ejecutarMision(misionId) {
       const sys = promptAgente('directora', m.pedido) +
         '\nAhora escribí el INFORME FINAL para Marcos: conclusión en 2-3 líneas, lo más importante de cada área, ' +
         'y próximos pasos numerados. Máximo 300 palabras. No repitas todo: sintetizá. No incluyas sección de acciones propuestas.';
-      const user = `Pedido: ${m.pedido}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 1400)}`).join('\n\n');
+      const user = `Pedido: ${m.pedido}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 3000)}`).join('\n\n');
       informe = separarAcciones(await complete(sys, user, { maxTokens: 800, temperature: 0.3, maxEsperaMs: 90000 })).texto;
     } else if (hechos.length === 1) {
       informe = hechos[0].texto;
