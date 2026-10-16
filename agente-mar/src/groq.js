@@ -240,31 +240,66 @@ async function urlExiste(url) {
     return r.status < 400 || r.status === 403 || r.status === 429;   // 403/429: la página existe pero bloquea robots
   } catch (e) { return false; } finally { clearTimeout(t); }
 }
-async function verificarFuentes(texto) {
+// Fecha más reciente que aparece en una viñeta (texto o URL). Devuelve {anio, fecha|null}
+const MESES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
+function fechaDe(linea) {
+  const fechas = [], anios = [];
+  for (const m of linea.matchAll(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](20\d{2})\b/g)) fechas.push(new Date(+m[3], +m[2] - 1, +m[1]));
+  for (const m of linea.matchAll(/\b(\d{1,2})\s+(?:de\s+)?(\w+)\s+(?:de\s+)?(20\d{2})\b/gi)) if (MESES[m[2].toLowerCase()]) fechas.push(new Date(+m[3], MESES[m[2].toLowerCase()] - 1, +m[1]));
+  for (const m of linea.matchAll(/\b(20[12]\d)(\d{2})(\d{2})\b/g)) fechas.push(new Date(+m[1], +m[2] - 1, +m[3]));   // URLs tipo /20241017
+  for (const m of linea.matchAll(/(?:^|[^\d])(\d{2})-(\d{2})-(2\d)(?=[\/-]|$|[^\d])/g)) fechas.push(new Date(2000 + +m[3], +m[2] - 1, +m[1])); // URLs tipo 23-10-24
+  for (const m of linea.matchAll(/\b(20[12]\d)\b/g)) anios.push(+m[1]);
+  for (const f of fechas) anios.push(f.getFullYear());
+  const fecha = fechas.length ? new Date(Math.max(...fechas.map((f) => f.getTime()))) : null;
+  return { anio: anios.length ? Math.max(...anios) : null, fecha };
+}
+
+async function verificarFuentes(texto, { novedades = false, diasMax = 45 } = {}) {
   if (!texto) return '';
   const lineas = texto.split('\n').map((l) => l.trim()).filter(Boolean);
   const urlsDe = (l) => (l.match(/https?:\/\/[^\s)\]>"']+/g) || []).map((u) => u.replace(/[.,;]+$/, ''));
   const todas = [...new Set(lineas.flatMap(urlsDe))].slice(0, 15);
   const ok = new Set();
   await Promise.all(todas.map(async (u) => { if (await urlExiste(u)) ok.add(u); }));
-  const validas = [], descartadas = [];
-  for (const l of lineas) {
+  const validas = [], descartadas = [], viejas = [];
+  const hoy = new Date(), anioActual = hoy.getFullYear();
+  for (const l0 of lineas) {
+    let l = l0;
     if (!/^[-•*]/.test(l)) continue;                                   // solo viñetas con hechos
     if (/no encontrado/i.test(l)) { validas.push(l); continue; }
     const us = urlsDe(l);
-    if (us.length && us.some((u) => ok.has(u))) validas.push(l); else descartadas.push(l);
+    if (!(us.length && us.some((u) => ok.has(u)))) { descartadas.push(l); continue; }
+    const { anio, fecha } = fechaDe(l);
+    if (novedades) {
+      // Pidieron novedades: solo vale lo publicado en los últimos días, con fecha
+      const vieja = fecha ? (hoy - fecha) / 864e5 > diasMax : (anio ? anio < anioActual : true);
+      if (vieja) { viejas.push(l); continue; }
+    } else if (anio && anio <= anioActual - 2) {
+      l += ` ⚠️ (dato de ${anio}: verificar si sigue vigente)`;
+    }
+    validas.push(l);
   }
+  if (novedades && viejas.length) console.warn(`[buscarWeb] ${viejas.length} dato(s) viejos descartados (se pidieron novedades)`);
   if (!validas.filter((l) => !/no encontrado/i.test(l)).length) {
+    if (novedades) return `- No encontrado: novedades confirmadas de los últimos ${diasMax} días con fecha y fuente verificable.` +
+      (viejas.length ? ` (Se descartaron ${viejas.length} dato(s) de fechas anteriores: no son novedades.)` : '');
     console.error('[buscarWeb] ninguna fuente verificable: se descarta la investigación');
     return '';
   }
   let out = validas.join('\n');
   if (descartadas.length) out += `\n\n(Se descartaron ${descartadas.length} dato(s) cuya fuente no existe o no se pudo verificar.)`;
+  if (viejas.length) out += `\n(Se descartaron ${viejas.length} dato(s) de fechas anteriores: no son novedades.)`;
   return out;
 }
 
-async function buscarWeb(pregunta, { maxEsperaMs = 60000 } = {}) {
+async function buscarWeb(pregunta, { maxEsperaMs = 60000, novedades = false } = {}) {
   const hoy = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const mesAnio = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: 'long', year: 'numeric' });
+  const extraNovedades = novedades
+    ? ` IMPORTANTE: piden NOVEDADES. Buscá solo lo publicado en los últimos 30 días (${mesAnio}): en el Boletín Oficial, ARCA y CNV las normas de este año tienen números altos. ` +
+      'Cada viñeta EMPIEZA con la fecha de publicación en formato DD/MM/AAAA. Ignorá notas de años anteriores aunque aparezcan primero en el buscador. ' +
+      'Si no hay novedades recientes de un tema, escribí "- No encontrado: novedades recientes sobre ...".'
+    : '';
   const body = {
     model: MODELO_BUSQUEDA,
     messages: [
@@ -274,8 +309,8 @@ async function buscarWeb(pregunta, { maxEsperaMs = 60000 } = {}) {
         'Respondé en español, SOLO con viñetas. Cada viñeta es UN hecho que leíste en una página, con fecha o vigencia si corresponde, ' +
         'y termina con la URL exacta de esa página entre paréntesis. Ejemplo: "- La Ley X está vigente desde ... (https://...)". ' +
         'No escribas nada que no hayas leído en una página que abriste. Si no encontrás algo, escribí "- No encontrado: ...". ' +
-        'No cites números de ley ni artículos que no figuren textualmente en la página.' },
-      { role: 'user', content: String(pregunta).slice(0, 2000) }
+        'No cites números de ley ni artículos que no figuren textualmente en la página.' + extraNovedades },
+      { role: 'user', content: (novedades ? `Novedades de ${mesAnio}. ` : '') + String(pregunta).slice(0, 2000) }
     ],
     tools: [{ type: 'browser_search' }],
     tool_choice: 'required',
@@ -292,7 +327,7 @@ async function buscarWeb(pregunta, { maxEsperaMs = 60000 } = {}) {
     if (Array.isArray(msg.executed_tools) && msg.executed_tools.length === 0) {
       console.error('[buscarWeb] el modelo no buscó: se descarta la respuesta'); return '';
     }
-    return await verificarFuentes((msg.content || '').replace(/【[^】]*】/g, '').trim());
+    return await verificarFuentes((msg.content || '').replace(/【[^】]*】/g, '').trim(), { novedades });
   } catch (e) {
     console.error('[buscarWeb]', e.message);
     return '';
@@ -341,4 +376,4 @@ async function leerImagen(dataUrl, nombre = 'imagen') {
   return String(data.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
-module.exports = { chat, complete, MODULOS, cantidadKeys, buscarWeb, verificarFuentes, recortar, leerImagen };
+module.exports = { chat, complete, MODULOS, cantidadKeys, buscarWeb, verificarFuentes, recortar, leerImagen, fechaDe };

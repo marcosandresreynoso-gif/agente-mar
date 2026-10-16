@@ -322,6 +322,14 @@ function guiaImpuestos() {
 }
 // Temas que necesitan datos actuales: el equipo busca en internet antes de trabajar
 const NECESITA_BUSQUEDA = /impuest|imposit|fiscal|tribut|arca|afip|ganancia|bienes personales|sellos|ley|norma|decreto|resoluci|cnv|regula|legal|mercado|competen|precio|tasa|d[oó]lar|inflaci|alquiler|tendencia|estad[ií]stica|actual|hoy|202[5-9]|noticia|buscá|busca|investig/i;
+// Pedidos de "novedades": solo sirve lo publicado en las últimas semanas
+const ES_NOVEDADES = /novedad|noticia|del d[ií]a|de hoy|esta semana|este mes|qu[eé] hay de nuevo|[uú]ltim[oa]s? (cambios|normas|resoluciones)|cambios? (impositiv|normativ|legal|contable)|actualizaci[oó]n (impositiva|normativa|legal)/i;
+const REGLA_NOVEDADES =
+  '\nNOVEDADES (te pidieron lo nuevo): presentá como novedad SOLO lo que la investigación web trae con fecha de los últimos 30 días. ' +
+  'Si la investigación dice "No encontrado", decí claramente "Hoy no encontré novedades confirmadas sobre X" y NO rellenes con normas viejas ni con lo que sabés de memoria. ' +
+  'Filtrá por lo que afecta a MARTOKEN: fideicomisos, tokenización, CNV (oferta pública, PSAV), inmuebles, Ganancias, Bienes Personales y Sellos de personas humanas, ' +
+  'facturación de Marcos como persona humana. Regímenes para grandes empresas (RIGI, grandes contribuyentes, comercio exterior) o de otras provincias: no aplican, no los propongas. ' +
+  'Cada novedad: fecha, qué cambió en 1 línea, fuente, y "Impacto para MARTOKEN: …" (o "sin impacto").\n';
 const ES_IMPOSITIVO = /impuest|imposit|fiscal|tribut|arca|afip|ganancia|bienes personales|sellos|escritur|inocencia|exenci|declara/i;
 
 function promptAgente(id, consulta, investigacion = '') {
@@ -337,6 +345,7 @@ function promptAgente(id, consulta, investigacion = '') {
   if (datos) s += `\nDATOS ACTUALES DEL SISTEMA:\n${datos}\n`;
   if (investigacion) s += `\nINVESTIGACIÓN WEB (hecha hoy, con fuentes):\n"""\n${investigacion.slice(0, 6000)}\n"""\n`;
   if (ES_IMPOSITIVO.test(consulta) && guiaImpuestos()) s += `\nGUÍA IMPOSITIVA VERIFICADA (única fuente válida para impuestos):\n"""\n${guiaImpuestos()}\n"""\n`;
+  if (ES_NOVEDADES.test(consulta)) s += REGLA_NOVEDADES;
   if (contexto && contexto.trim()) s += `\nDOCUMENTACIÓN DE MARTOKEN (fuente principal):\n"""\n${contexto}\n"""\n`;
   return s;
 }
@@ -400,7 +409,8 @@ async function chatConAgente({ agente, message, history = [], adjuntos = [] }) {
   }
   const hist = history.slice(-6).map((h) => `${h.role === 'user' ? 'Marcos' : AGENTES[agente].nombre}: ${String(h.content || '').slice(0, 1500)}`).join('\n');
   const user = (hist ? `Conversación hasta ahora:\n${hist}\n\n` : '') + `Marcos: ${String(message).slice(0, 4000)}` + bloqueAdjuntos(adj, 7000, recortar);
-  const investigacion = NECESITA_BUSQUEDA.test(message) ? await buscarWeb(`${message}\n(Contexto: MARTOKEN, tokenización inmobiliaria en Argentina, fideicomiso, tokens en Polygon.)`) : '';
+  const novedades = ES_NOVEDADES.test(message);
+  const investigacion = (NECESITA_BUSQUEDA.test(message) || novedades) ? await buscarWeb(`${message}\n(Contexto: MARTOKEN, tokenización inmobiliaria en Argentina, fideicomiso, tokens en Polygon.)`, { novedades }) : '';
   const out = await complete(promptAgente(agente, message, investigacion), user, { maxTokens: 1000, temperature: 0.4, maxEsperaMs: 45000 });
   const sep = separarAcciones(out);
   const texto = controlarYAnotar(sep.texto), acciones = sep.acciones;
@@ -422,7 +432,8 @@ async function planificar(pedido, adjTexto = '') {
     `Equipo disponible:\n${equipo}\n\n` +
     'Respondé SOLO un JSON con esta forma: {"resumen":"qué vas a hacer en 1 frase","tareas":[{"agente":"id","tarea":"instrucción concreta"}]}\n' +
     'Reglas: entre 1 y 4 tareas, solo los agentes necesarios, en orden lógico (los que dependen de otros van después). ' +
-    'Usá exactamente los id de la lista.';
+    'Usá exactamente los id de la lista.\n' +
+    'Si piden novedades o cambios legales, impositivos, contables o de la CNV: legal (normas y CNV), finanzas (impuestos y contable) y cumplimiento (qué cambia para MARTOKEN), en ese orden.';
   const raw = await complete(sys, pedido + adjTexto, { json: true, maxTokens: 500, maxEsperaMs: 90000 });
   let plan;
   try { plan = JSON.parse(raw); } catch (e) { plan = null; }
@@ -452,9 +463,10 @@ async function ejecutarMision(misionId) {
     const insT = db.prepare('INSERT INTO eq_tareas (mision_id, orden, agente, tarea) VALUES (?,?,?,?)');
     plan.tareas.forEach((t, i) => insT.run(misionId, i + 1, t.agente, String(t.tarea).slice(0, 1000)));
     let investigacion = '';
-    if (NECESITA_BUSQUEDA.test(m.pedido)) {
+    const novedades = ES_NOVEDADES.test(m.pedido);
+    if (NECESITA_BUSQUEDA.test(m.pedido) || novedades) {
       upd({ estado: 'trabajando', resumen_plan: plan.resumen + ' (investigando en internet…)' });
-      investigacion = await buscarWeb(`${m.pedido}\n(Contexto: MARTOKEN, tokenización inmobiliaria en Argentina, fideicomiso, tokens en Polygon. Buscá los datos actuales que el equipo necesita.)`, { maxEsperaMs: 90000 });
+      investigacion = await buscarWeb(`${m.pedido}\n(Contexto: MARTOKEN, tokenización inmobiliaria en Argentina, fideicomiso, tokens en Polygon. Buscá los datos actuales que el equipo necesita.)`, { maxEsperaMs: 90000, novedades });
     }
     upd({ estado: 'trabajando', resumen_plan: plan.resumen, investigacion: investigacion || null });
 
