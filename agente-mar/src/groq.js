@@ -196,6 +196,37 @@ console.log(`[groq] ${GROQ_KEYS.length} key(s) de Groq cargada(s)`);
 // Búsqueda en internet con la herramienta browser_search de Groq (modelos gpt-oss).
 // Devuelve un resumen con hechos y una lista de fuentes con URL. Si falla, devuelve '' y el agente sigue sin búsqueda.
 const MODELO_BUSQUEDA = process.env.GROQ_MODEL_BUSQUEDA || 'openai/gpt-oss-120b';
+// Comprueba que cada URL citada exista de verdad. Solo quedan los datos con una fuente que responde.
+async function urlExiste(url) {
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(url, { method: 'GET', redirect: 'follow', signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (agente-mar verificador)' } });
+    return r.status < 400 || r.status === 403 || r.status === 429;   // 403/429: la página existe pero bloquea robots
+  } catch (e) { return false; } finally { clearTimeout(t); }
+}
+async function verificarFuentes(texto) {
+  if (!texto) return '';
+  const lineas = texto.split('\n').map((l) => l.trim()).filter(Boolean);
+  const urlsDe = (l) => (l.match(/https?:\/\/[^\s)\]>"']+/g) || []).map((u) => u.replace(/[.,;]+$/, ''));
+  const todas = [...new Set(lineas.flatMap(urlsDe))].slice(0, 15);
+  const ok = new Set();
+  await Promise.all(todas.map(async (u) => { if (await urlExiste(u)) ok.add(u); }));
+  const validas = [], descartadas = [];
+  for (const l of lineas) {
+    if (!/^[-•*]/.test(l)) continue;                                   // solo viñetas con hechos
+    if (/no encontrado/i.test(l)) { validas.push(l); continue; }
+    const us = urlsDe(l);
+    if (us.length && us.some((u) => ok.has(u))) validas.push(l); else descartadas.push(l);
+  }
+  if (!validas.filter((l) => !/no encontrado/i.test(l)).length) {
+    console.error('[buscarWeb] ninguna fuente verificable: se descarta la investigación');
+    return '';
+  }
+  let out = validas.join('\n');
+  if (descartadas.length) out += `\n\n(Se descartaron ${descartadas.length} dato(s) cuya fuente no existe o no se pudo verificar.)`;
+  return out;
+}
+
 async function buscarWeb(pregunta, { maxEsperaMs = 60000 } = {}) {
   const hoy = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
   const body = {
@@ -204,8 +235,10 @@ async function buscarWeb(pregunta, { maxEsperaMs = 60000 } = {}) {
       { role: 'system', content:
         `Sos investigador. Hoy es ${hoy}. Buscá en internet información ACTUAL y verificable para Argentina sobre lo que se pide. ` +
         'Priorizá fuentes oficiales (argentina.gob.ar, arca.gob.ar, cnv.gob.ar, boletinoficial.gob.ar, infoleg) y medios especializados reconocidos. ' +
-        'Respondé en español: primero los hechos concretos en viñetas (con fecha o vigencia cuando corresponda), ' +
-        'después "Fuentes:" con la URL de cada dato. Si no encontrás algo, decí "No encontrado" en vez de suponer. No inventes.' },
+        'Respondé en español, SOLO con viñetas. Cada viñeta es UN hecho que leíste en una página, con fecha o vigencia si corresponde, ' +
+        'y termina con la URL exacta de esa página entre paréntesis. Ejemplo: "- La Ley X está vigente desde ... (https://...)". ' +
+        'No escribas nada que no hayas leído en una página que abriste. Si no encontrás algo, escribí "- No encontrado: ...". ' +
+        'No cites números de ley ni artículos que no figuren textualmente en la página.' },
       { role: 'user', content: String(pregunta).slice(0, 2000) }
     ],
     tools: [{ type: 'browser_search' }],
@@ -218,11 +251,16 @@ async function buscarWeb(pregunta, { maxEsperaMs = 60000 } = {}) {
     const res = await fetchGroq(body, { maxEsperaMs });
     if (!res.ok) { console.error('[buscarWeb] Groq', res.status, (await res.text().catch(() => '')).slice(0, 200)); return ''; }
     const data = await res.json();
-    return (data.choices?.[0]?.message?.content || '').replace(/【[^】]*】/g, '').trim();
+    const msg = data.choices?.[0]?.message || {};
+    // Si el modelo no ejecutó la búsqueda de verdad, lo que escribió no tiene respaldo: se descarta
+    if (Array.isArray(msg.executed_tools) && msg.executed_tools.length === 0) {
+      console.error('[buscarWeb] el modelo no buscó: se descarta la respuesta'); return '';
+    }
+    return await verificarFuentes((msg.content || '').replace(/【[^】]*】/g, '').trim());
   } catch (e) {
     console.error('[buscarWeb]', e.message);
     return '';
   }
 }
 
-module.exports = { chat, complete, MODULOS, cantidadKeys, buscarWeb };
+module.exports = { chat, complete, MODULOS, cantidadKeys, buscarWeb, verificarFuentes };
