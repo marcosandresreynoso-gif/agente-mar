@@ -12,20 +12,22 @@ Toda pieza que hable de impuestos cierra con: "Información general. Consultá t
 Comprar un inmueble de forma directa obliga a escriturar, y eso tiene costos e impuestos:
 - Impuesto de Sellos: en Provincia de Buenos Aires 2% del valor (en general se divide: 1% comprador y 1% vendedor). En CABA 2,7% (3,5% en valores altos).
 - Honorarios del escribano: alrededor del 1% a 1,25% del valor, más IVA y aportes.
-- En total, una compra directa le suma al comprador aproximadamente entre 5% y 8% del precio (incluyendo inmobiliaria).
+- Sellos más escritura y escribano le suman al comprador aproximadamente entre 3% y 4% del precio. Con la comisión de la inmobiliaria, el total llega a 5% a 8%, pero la comisión NO es un impuesto ni un gasto de escritura: no la uses para esta ventaja.
 
 Con MARTOKEN el inversor compra tokens: NO escritura a su nombre ni paga escribano para entrar.
-El terreno se escritura UNA sola vez, a nombre del fideicomiso, y ese costo se reparte en el proyecto.
+El terreno se escritura UNA sola vez, a nombre del fideicomiso, y ese costo se reparte en el proyecto: el inversor lo paga indirectamente y en proporción, no es que no exista.
 
 Cómo decirlo:
 - "Invertís en ladrillos sin pagar escritura ni escribano: el inmueble se escritura una sola vez, a nombre del fideicomiso."
-- "En una compra tradicional, escritura y sellos suman entre 5% y 8% del precio. Con tokens, entrás sin esos gastos a tu nombre."
+- "En una compra tradicional, sellos y escritura suman entre 3% y 4% del precio. Con MARTOKEN no escriturás a tu nombre: el inmueble se escritura una sola vez y el costo se reparte en el proyecto."
 
 A CONFIRMAR con contador: si la compra de tokens paga Impuesto de Sellos en alguna provincia.
 
 ---
 
 ## VENTAJA IMPOSITIVA 2 — Inocencia Fiscal: tus ahorros en dólares, a trabajar de forma formal
+
+No es exclusiva de MARTOKEN: aplica a cualquier inversión formal y solo a quienes adhieren al régimen simplificado.
 
 - Ley 27.799 de Inocencia Fiscal: vigente desde el 2 de enero de 2026, reglamentada por el Decreto 93/2026.
 - Personas humanas que se adhieren al Régimen Simplificado de Ganancias (ingresos de hasta $1.000 millones al año y patrimonio de hasta $10.000 millones, entre otros requisitos):
@@ -41,11 +43,16 @@ Cómo decirlo:
 
 ---
 
-## VENTAJA 3 — Los impuestos del inmueble los gestiona el fideicomiso
+## VENTAJA 3 — Sin trámites del inmueble a tu nombre
 
 El inmueble está a nombre del fideicomiso, que administra la obra y sus obligaciones.
 El inversor no tiene que ocuparse de la escritura, ni de las tasas e impuestos del inmueble como propietario directo:
 declara su participación (sus tokens) como corresponda.
+OJO: el fideicomiso paga esos impuestos con dinero del proyecto, así que impactan en el retorno. Es una ventaja operativa (no hacés trámites), no un ahorro.
+
+Cómo decirlo (aprobado):
+- "Sin trámites del inmueble a tu nombre: el fideicomiso administra la obra, las tasas y los impuestos del inmueble. Vos declarás tu participación: tus tokens."
+- Nunca decir: "no pagás impuestos del inmueble" ni "los impuestos no son tu problema".
 
 A CONFIRMAR con el contrato de fideicomiso y el contador antes de afirmarlo en publicidad:
 quién paga el impuesto inmobiliario y las tasas, y cómo declara el inversor su participación (Ganancias y Bienes Personales).
@@ -59,7 +66,9 @@ quién paga el impuesto inmobiliario y las tasas, y cómo declara el inversor su
   Las exenciones existen solo para valores con oferta pública autorizada por la CNV, y MARTOKEN hoy no es oferta pública.
 - "Sin ITP" o "sin ITI": el ITP es un impuesto de España, no existe en Argentina. El ITI argentino (1,5% en la venta de inmuebles)
   fue derogado por la Ley 27.743 (2024) para todos, así que no es una ventaja de MARTOKEN.
-- "Dividendos en dólares sin retención": no está confirmado. Que se cobre en dólares no cambia el impuesto.
+- "Dividendos en dólares sin retención" o "retención del 31%": no existen así. Que se cobre en dólares no cambia el impuesto.
+- "ITBI": es un impuesto de Brasil. "IDC" (débitos y créditos) no tiene exención por operar con tokens.
+- Leyes 27.551 (alquileres) y 27.442 (defensa de la competencia) no tienen nada que ver con tokens.
 - "Sin impuestos", "exento", "libre de impuestos", "pagás menos impuestos" en forma general.
 - No citar números de ley o artículos que no estén en esta guía.
 
