@@ -104,6 +104,8 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_wa_msg_waid ON wa_mensajes(wa_id);
   `);
 
+  try { db.exec('ALTER TABLE documentos ADD COLUMN hash TEXT'); } catch (e) { /* ya existe */ }
+
   // Config por defecto de la empresa
   const defaults = {
     empresa_nombre: 'Organización M-AR & Asociados',

@@ -127,20 +127,21 @@ function seedFromRepo() {
 
   for (const archivo of archivos) {
     // ¿Ya está indexado este archivo?
-    const yaEsta = db
-      .prepare('SELECT id FROM documentos WHERE nombre_archivo = ?')
-      .get(archivo);
-    if (yaEsta) continue;
-
     try {
       const text = fs.readFileSync(path.join(dir, archivo), 'utf8');
       if (!text.trim()) continue;
-      indexDocument({
+      // Si el documento ya está cargado y no cambió, se deja; si cambió, se vuelve a cargar
+      const hash = require('crypto').createHash('sha1').update(text).digest('hex');
+      const yaEsta = db.prepare('SELECT id, hash FROM documentos WHERE nombre_archivo = ?').get(archivo);
+      if (yaEsta && yaEsta.hash === hash) continue;
+      if (yaEsta) { deleteDoc(yaEsta.id); console.log(`[RAG] ${archivo} cambió: se vuelve a cargar`); }
+      const r = indexDocument({
         nombre_archivo: archivo,
         titulo: archivo.replace(/\.(md|txt)$/i, '').replace(/[-_]/g, ' '),
         modulo: 'todos',
         text,
       });
+      db.prepare('UPDATE documentos SET hash = ? WHERE id = ?').run(hash, r.docId);
       cargados++;
       console.log(`[RAG] Documento base indexado: ${archivo}`);
     } catch (e) {
