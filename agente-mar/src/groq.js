@@ -26,28 +26,53 @@ function nextKey() {
 // hasta un máximo (maxEsperaMs). Las misiones del equipo esperan más; el chat público, poco.
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Keys que agotaron el cupo DIARIO de un modelo: no se vuelven a usar con ese modelo hasta que se renueve
+const agotadas = new Map();   // `${key}|${modelo}` -> timestamp hasta cuando
+// "Please try again in 7m12.5s" -> ms
+function esperaDeMensaje(txt) {
+  const m = String(txt).match(/try again in\s+(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:([\d.]+)s)?/i);
+  if (!m || !(m[1] || m[2] || m[3])) return 0;
+  return ((+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (parseFloat(m[3]) || 0)) * 1000;
+}
+const errorGroq = (msg, extra) => Object.assign(new Error(msg), extra);
+
 async function fetchGroq(body, { maxEsperaMs = 15000 } = {}) {
   if (GROQ_KEYS.length === 0) throw new Error('No hay ninguna GROQ_API_KEY configurada en Render.');
   const limite = Date.now() + maxEsperaMs;
+  const modelo = body.model;
   for (;;) {
-    let esperaSugerida = 0;
+    let esperaSugerida = 0, probadas = 0;
     for (let i = 0; i < GROQ_KEYS.length; i++) {
       const key = nextKey();
+      const hasta = agotadas.get(`${key}|${modelo}`);
+      if (hasta && hasta > Date.now()) continue;           // esta key ya gastó el cupo del día con este modelo
+      probadas++;
       const res = await fetch(GROQ_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify(body)
       });
       if (res.status !== 429) return res;
-      // Groq dice cuántos segundos esperar (retry-after); si no, 6 s
-      const ra = parseFloat(res.headers.get('retry-after')) || 6;
+      const txt = await res.text().catch(() => '');
+      if (/per day|\(TPD\)|\(RPD\)/i.test(txt)) {
+        // Cupo diario agotado: esperar no sirve; se marca la key y se sigue con las otras
+        const ms = esperaDeMensaje(txt) || 60 * 60 * 1000;
+        agotadas.set(`${key}|${modelo}`, Date.now() + ms);
+        console.warn(`[groq] key …${key.slice(-4)} sin cupo diario para ${modelo} por ${Math.round(ms / 60000)} min`);
+        continue;
+      }
+      // Límite por minuto: Groq dice cuántos segundos esperar (retry-after); si no, 6 s
+      const ra = parseFloat(res.headers.get('retry-after')) || esperaDeMensaje(txt) / 1000 || 6;
       esperaSugerida = esperaSugerida ? Math.min(esperaSugerida, ra) : ra;
-      await res.text().catch(() => {});
+    }
+    if (!probadas || !esperaSugerida) {
+      throw errorGroq(`Se terminó el cupo diario gratis de Groq para ${modelo} en las ${GROQ_KEYS.length} keys.`, { cupoDiario: true });
     }
     const espera = Math.min(Math.max(esperaSugerida, 1) * 1000 + 500, 30000);
     if (Date.now() + espera > limite) {
-      throw new Error(
-        `Groq está al límite (${GROQ_KEYS.length} key${GROQ_KEYS.length === 1 ? '' : 's'} cargada${GROQ_KEYS.length === 1 ? '' : 's'}). Probá de nuevo en un minuto.`
+      throw errorGroq(
+        `Groq está al límite (${GROQ_KEYS.length} key${GROQ_KEYS.length === 1 ? '' : 's'} cargada${GROQ_KEYS.length === 1 ? '' : 's'}). Probá de nuevo en un minuto.`,
+        { alLimite: true }
       );
     }
     console.log(`[groq] keys al límite, espero ${Math.round(espera / 1000)} s y reintento`);
@@ -176,7 +201,20 @@ function ajustarAlLimite(body, factor = 1) {
   return true;
 }
 
-async function complete(systemMsg, userMsg, { json = false, maxTokens = 700, temperature = 0.1, maxEsperaMs = 15000 } = {}) {
+// Modelo de respaldo: tiene su propio cupo en Groq. Se usa si el principal se quedó sin cupo.
+const MODEL_RESPALDO = process.env.GROQ_MODEL_RESPALDO || 'openai/gpt-oss-20b';
+
+async function complete(systemMsg, userMsg, opciones = {}) {
+  try {
+    return await completeCon(MODEL, systemMsg, userMsg, opciones);
+  } catch (e) {
+    if (!(e.cupoDiario || e.alLimite) || !MODEL_RESPALDO || MODEL_RESPALDO === MODEL) throw e;
+    console.warn(`[groq] ${MODEL} sin cupo (${e.message.slice(0, 80)}): uso el respaldo ${MODEL_RESPALDO}`);
+    return await completeCon(MODEL_RESPALDO, systemMsg, userMsg, { ...opciones, maxEsperaMs: Math.min(opciones.maxEsperaMs || 15000, 45000) });
+  }
+}
+
+async function completeCon(MODEL, systemMsg, userMsg, { json = false, maxTokens = 700, temperature = 0.1, maxEsperaMs = 15000 } = {}) {
   const body = {
     model: MODEL,
     messages: [
@@ -319,7 +357,13 @@ async function buscarWeb(pregunta, { maxEsperaMs = 60000, novedades = false } = 
     max_tokens: 3500
   };
   try {
-    const res = await fetchGroq(body, { maxEsperaMs });
+    let res;
+    try { res = await fetchGroq(body, { maxEsperaMs }); } catch (e) {
+      if (!(e.cupoDiario || e.alLimite) || MODEL_RESPALDO === body.model || !/gpt-oss/.test(MODEL_RESPALDO)) throw e;
+      console.warn('[buscarWeb] sin cupo, busco con', MODEL_RESPALDO);
+      body.model = MODEL_RESPALDO;
+      res = await fetchGroq(body, { maxEsperaMs: 45000 });
+    }
     if (!res.ok) { console.error('[buscarWeb] Groq', res.status, (await res.text().catch(() => '')).slice(0, 200)); return ''; }
     const data = await res.json();
     const msg = data.choices?.[0]?.message || {};
