@@ -283,13 +283,24 @@ const REGLAS_COMUNES =
   '- Trabajás en ARGENTINA. El organismo fiscal es ARCA (ex AFIP). No uses impuestos ni normas de otros países (por ejemplo "ITP" es de España).\n' +
   '- NUNCA cites números de ley, artículos, resoluciones ni alícuotas que no estén en la documentación. Si no estás seguro, escribí "(a verificar con contador/abogado)". Inventar una norma es el peor error posible.\n' +
   '- Si revisás el trabajo de un compañero, revisá TODO lo que hizo. Si algo no lo recibiste completo, decilo; no lo supongas.\n' +
-  '- Hoy NO hay beneficios impositivos confirmados para invertir en MARTOKEN. No afirmes exenciones ni que se pagan menos impuestos.\n' +
+  '- IMPUESTOS: cuando el tema sea impositivo, usá SOLO la "GUÍA IMPOSITIVA VERIFICADA". Explicá con claridad las ventajas que ahí figuran; no agregues otras ni afirmes lo que la guía marca como falso o A CONFIRMAR. Cerrá con: "Información general. Consultá tu caso con tu contador."\n' +
   '- No inventes datos: si algo no está en la documentación ni en los datos, decilo y sugerí cómo conseguirlo.\n' +
   '- NUNCA ejecutás acciones externas (enviar mensajes, publicar, pagar, firmar, lanzar campañas). ' +
   'Si hace falta una, la proponés al final para que Marcos la apruebe.\n' +
   '- Si proponés acciones, terminá tu respuesta con una sección exacta así:\n' +
   'ACCIONES PROPUESTAS:\n- (acción concreta 1)\n- (acción concreta 2)\n' +
   'Si no hay acciones, no pongas esa sección.';
+
+// Guía impositiva verificada (conocimiento/impuestos.md): se agrega completa cuando el tema es impositivo
+let GUIA_IMPUESTOS = null;
+function guiaImpuestos() {
+  if (GUIA_IMPUESTOS === null) {
+    try { GUIA_IMPUESTOS = require('fs').readFileSync(require('path').join(__dirname, '..', 'conocimiento', 'impuestos.md'), 'utf8'); }
+    catch (e) { GUIA_IMPUESTOS = ''; }
+  }
+  return GUIA_IMPUESTOS;
+}
+const ES_IMPOSITIVO = /impuest|imposit|fiscal|tribut|arca|afip|ganancia|bienes personales|sellos|escritur|inocencia|exenci|declara/i;
 
 function promptAgente(id, consulta) {
   const a = AGENTES[id];
@@ -302,6 +313,7 @@ function promptAgente(id, consulta) {
     `Tu jefe es Marcos Reynoso, fundador y fiduciario.\n${a.prompt}\n\n` +
     `FOCO ACTUAL DEL EQUIPO (tiene prioridad; todo tu trabajo apunta a esto salvo que Marcos pida otra cosa):\n${foco}\n\n${REGLAS_COMUNES}\n`;
   if (datos) s += `\nDATOS ACTUALES DEL SISTEMA:\n${datos}\n`;
+  if (ES_IMPOSITIVO.test(consulta) && guiaImpuestos()) s += `\nGUÍA IMPOSITIVA VERIFICADA (única fuente válida para impuestos):\n"""\n${guiaImpuestos()}\n"""\n`;
   if (contexto && contexto.trim()) s += `\nDOCUMENTACIÓN DE MARTOKEN (fuente principal):\n"""\n${contexto}\n"""\n`;
   return s;
 }
