@@ -39,22 +39,36 @@ const post = (path, body) => api(path, { method: 'POST', body: JSON.stringify(bo
 const esc = (s) => String(s ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 const hora = (iso) => iso ? new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
 
-// Markdown simple → HTML (títulos, negrita, listas, párrafos)
+// Markdown simple → HTML (títulos, negrita, listas, tablas, párrafos). Todo se lee hacia abajo.
 function md(txt) {
   const lines = esc(txt).split('\n');
-  let html = '', lista = null;
+  let html = '', lista = null, tabla = [];
+  const fmt = (l) => l.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|\s)\*(\S[^*]*?)\*/g, '$1<b>$2</b>');
   const cerrar = () => { if (lista) { html += `</${lista}>`; lista = null; } };
-  for (let l of lines) {
-    l = l.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|\s)\*(\S[^*]*?)\*/g, '$1<b>$2</b>');
+  const celdas = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => fmt(c.trim()));
+  const volcarTabla = () => {
+    if (!tabla.length) return;
+    const filas = tabla.filter((l) => !/^\s*\|?\s*:?-{2,}/.test(l)).map(celdas);
+    tabla = [];
+    if (!filas.length) return;
+    const [cab, ...cuerpo] = filas.length > 1 ? filas : [[], ...filas];
+    // Cada fila es una ficha: "Columna: valor" uno debajo del otro
+    html += '<div class="mdt">' + cuerpo.map((f) => '<div class="mdt-fila">' + f.map((c, k) =>
+      `<div><span class="mdt-k">${cab[k] || ''}</span>${cab[k] ? ' ' : ''}${c}</div>`).join('') + '</div>').join('') + '</div>';
+  };
+  for (const raw of lines) {
+    if (/^\s*\|/.test(raw)) { cerrar(); tabla.push(raw); continue; }
+    volcarTabla();
+    const l = fmt(raw);
     let m;
     if ((m = l.match(/^\s*#{1,6}\s+(.*)/))) { cerrar(); html += `<h4>${m[1]}</h4>`; }
     else if ((m = l.match(/^\s*[-•*]\s+(.*)/))) { if (lista !== 'ul') { cerrar(); html += '<ul>'; lista = 'ul'; } html += `<li>${m[1]}</li>`; }
     else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))) { if (lista !== 'ol') { cerrar(); html += '<ol>'; lista = 'ol'; } html += `<li>${m[1]}</li>`; }
-    else if (/^\s*\|/.test(l)) { cerrar(); html += `<p style="font-family:var(--mono);font-size:12px;white-space:pre">${l}</p>`; }
+    else if (/^\s*-{3,}\s*$/.test(l)) { cerrar(); html += '<hr>'; }
     else if (l.trim()) { cerrar(); html += `<p>${l}</p>`; }
     else cerrar();
   }
-  cerrar();
+  volcarTabla(); cerrar();
   return html;
 }
 function avatar(id, cls = '') {
