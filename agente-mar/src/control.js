@@ -29,6 +29,7 @@ const CORRECCIONES = [
 
 // Alertas: no se corrigen solas, Marcos las tiene que revisar
 const ALERTAS = [
+  [/(autorizad[oa]s?|aprobad[oa]s?|regulad[oa]s?|registrad[oa]s?)\s+(por|ante|en)\s+(la\s+)?CNV|cumple\w*\s+(con\s+)?(la\s+)?(normativa\s+de\s+la\s+)?CNV|tokens?\s+como\s+valores\s+negociables/gi, 'Afirma que MARTOKEN está autorizado o cumple con la CNV: hoy NO hace oferta pública ni está en el sandbox. Revisar.', 'negable'],
   [/\bsoy\s+(Luc[ií]a|Tom[aá]s|Sof[ií]a|Bruno|Martina|Diego|Ramiro|Elena|Victoria)\b/gi, 'Se presenta con un nombre de agente. Los mensajes hacia afuera los firma Marcos.'],
   [/rentabilidad\s+garantizada|renta\s+garantizada|ganancia\s+(segura|garantizada)|sin\s+riesgo/gi, 'Promete rentabilidad o ausencia de riesgo.', 'negable'],
   [/\b(EE\.?\s?UU\.?|Estados\s+Unidos|USA)\b/g, '⚖️ Captación o publicidad fuera de Argentina: REQUIERE CONSULTA LEGAL PREVIA (en EE.UU. puede ser oferta de valores regulada por la SEC).'],

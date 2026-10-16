@@ -280,16 +280,28 @@ async function urlExiste(url) {
 }
 // Fecha más reciente que aparece en una viñeta (texto o URL). Devuelve {anio, fecha|null}
 const MESES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
+// La fecha de PUBLICACIÓN es la primera fecha del texto que no está en el futuro
+// ("hasta el 31/12/2027" es un vencimiento, no la publicación). Si el texto no tiene, se usa la de la URL.
 function fechaDe(linea) {
-  const fechas = [], anios = [];
-  for (const m of linea.matchAll(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](20\d{2})\b/g)) fechas.push(new Date(+m[3], +m[2] - 1, +m[1]));
-  for (const m of linea.matchAll(/\b(\d{1,2})\s+(?:de\s+)?(\w+)\s+(?:de\s+)?(20\d{2})\b/gi)) if (MESES[m[2].toLowerCase()]) fechas.push(new Date(+m[3], MESES[m[2].toLowerCase()] - 1, +m[1]));
-  for (const m of linea.matchAll(/\b(20[12]\d)(\d{2})(\d{2})\b/g)) fechas.push(new Date(+m[1], +m[2] - 1, +m[3]));   // URLs tipo /20241017
-  for (const m of linea.matchAll(/(?:^|[^\d])(\d{2})-(\d{2})-(2\d)(?=[\/-]|$|[^\d])/g)) fechas.push(new Date(2000 + +m[3], +m[2] - 1, +m[1])); // URLs tipo 23-10-24
-  for (const m of linea.matchAll(/\b(20[12]\d)\b/g)) anios.push(+m[1]);
-  for (const f of fechas) anios.push(f.getFullYear());
-  const fecha = fechas.length ? new Date(Math.max(...fechas.map((f) => f.getTime()))) : null;
-  return { anio: anios.length ? Math.max(...anios) : null, fecha };
+  const urls = (linea.match(/https?:\/\/\S+/g) || []).join(' ');
+  const texto = linea.replace(/https?:\/\/\S+/g, ' ');
+  const enOrden = (s, pats) => {
+    const hall = [];
+    for (const [re, f] of pats) for (const m of s.matchAll(re)) { const d = f(m); if (d && !isNaN(d)) hall.push({ i: m.index, d }); }
+    return hall.sort((a, b) => a.i - b.i).map((h) => h.d);
+  };
+  const PAT_TEXTO = [
+    [/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](20\d{2})\b/g, (m) => new Date(+m[3], +m[2] - 1, +m[1])],
+    [/\b(\d{1,2})\s+(?:de\s+)?([a-záéíóú]+)\s+(?:de\s+)?(20\d{2})\b/gi, (m) => MESES[m[2].toLowerCase()] ? new Date(+m[3], MESES[m[2].toLowerCase()] - 1, +m[1]) : null]
+  ];
+  const PAT_URL = [
+    [/(20[12]\d)(\d{2})(\d{2})(?!\d)/g, (m) => new Date(+m[1], +m[2] - 1, +m[3])],                    // /20241017
+    [/(?:^|[^\d])(\d{2})-(\d{2})-(2\d)(?=[\/-]|$|[^\d])/g, (m) => new Date(2000 + +m[3], +m[2] - 1, +m[1])] // 23-10-24
+  ];
+  const manana = Date.now() + 864e5;
+  const fecha = enOrden(texto, PAT_TEXTO).find((d) => d <= manana) || enOrden(urls, PAT_URL).find((d) => d <= manana) || null;
+  const anios = [...texto.matchAll(/\b(20[12]\d)\b/g)].map((m) => +m[1]).filter((a) => a <= new Date().getFullYear());
+  return { anio: fecha ? fecha.getFullYear() : (anios.length ? Math.min(...anios) : null), fecha };
 }
 
 async function verificarFuentes(texto, { novedades = false, diasMax = 45 } = {}) {
