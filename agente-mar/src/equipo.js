@@ -230,6 +230,15 @@ function initEquipo() {
       decidida_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_eq_tareas_m ON eq_tareas(mision_id, orden);
+    CREATE TABLE IF NOT EXISTS eq_chat (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dia TEXT NOT NULL,                    -- YYYY-MM-DD, hora de Argentina
+      agente TEXT NOT NULL,
+      role TEXT NOT NULL,                   -- user | assistant
+      content TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_eq_chat_dia ON eq_chat(dia, agente, id);
   `);
 }
 
@@ -268,6 +277,7 @@ function datosDelSistema(tipo) {
 const REGLAS_COMUNES =
   'Reglas del equipo:\n' +
   '- Español rioplatense, directo y sin relleno. Usá títulos cortos y viñetas cuando ayuden.\n' +
+  '- NO uses tablas: Marcos lee desde el celular. Presentá todo en listas o párrafos cortos, uno debajo del otro.\n' +
   '- No inventes datos: si algo no está en la documentación ni en los datos, decilo y sugerí cómo conseguirlo.\n' +
   '- NUNCA ejecutás acciones externas (enviar mensajes, publicar, pagar, firmar, lanzar campañas). ' +
   'Si hace falta una, la proponés al final para que Marcos la apruebe.\n' +
@@ -298,6 +308,36 @@ function separarAcciones(texto) {
   return { texto: m[0].trim(), acciones };
 }
 
+/* ============================ HISTORIAL DE CHATS POR DÍA ============================ */
+const hoyAR = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+const DIA_OK = /^\d{4}-\d{2}-\d{2}$/;
+
+function guardarChat(agente, role, content, dia = hoyAR()) {
+  if (!AGENTES[agente] || !content) return;
+  db.prepare('INSERT INTO eq_chat (dia, agente, role, content, created_at) VALUES (?,?,?,?,?)')
+    .run(dia, agente, role === 'user' ? 'user' : 'assistant', String(content).slice(0, 20000), now());
+}
+function diasDeChat() {
+  return db.prepare('SELECT dia, agente, COUNT(*) n FROM eq_chat GROUP BY dia, agente ORDER BY dia DESC').all();
+}
+function chatsDelDia(dia) {
+  if (!DIA_OK.test(dia || '')) dia = hoyAR();
+  const out = {};
+  for (const r of db.prepare('SELECT agente, role, content FROM eq_chat WHERE dia = ? ORDER BY id').all(dia)) {
+    (out[r.agente] = out[r.agente] || []).push({ role: r.role, content: r.content });
+  }
+  return { dia, chats: out };
+}
+// Si el servidor se borró (deploy en el plan gratis), el celular vuelve a subir su copia
+function restaurarChat(dia, agente, mensajes) {
+  if (!DIA_OK.test(dia || '') || !AGENTES[agente] || !Array.isArray(mensajes)) return 0;
+  const ya = db.prepare('SELECT COUNT(*) n FROM eq_chat WHERE dia = ? AND agente = ?').get(dia, agente).n;
+  if (ya > 0) return 0;
+  const lista = mensajes.slice(0, 500).filter((m) => m && m.content);
+  db.transaction(() => { for (const m of lista) guardarChat(agente, m.role, m.content, dia); })();
+  return lista.length;
+}
+
 /* ============================ CHAT DIRECTO CON UN AGENTE ============================ */
 async function chatConAgente({ agente, message, history = [] }) {
   if (!AGENTES[agente]) throw new Error('Ese agente no existe.');
@@ -307,6 +347,8 @@ async function chatConAgente({ agente, message, history = [] }) {
     const previos = history.filter((h) => h.role === 'user').slice(-2).map((h) => String(h.content || '').slice(0, 800));
     const pedido = (previos.length ? `Contexto de lo que Marcos venía hablando: ${previos.join(' / ')}\n\n` : '') + String(message).slice(0, 2500);
     const id = crearMision(pedido);
+    const respuesta = 'Recibido. Armo la misión y la reparto al equipo. Te voy contando acá quién trabaja en qué y, cuando terminen, te dejo el informe en este chat.';
+    guardarChat(agente, 'user', message); guardarChat(agente, 'assistant', respuesta);
     return {
       reply: 'Recibido. Armo la misión y la reparto al equipo. Te voy contando acá quién trabaja en qué y, cuando terminen, te dejo el informe en este chat.',
       acciones: [],
@@ -320,6 +362,7 @@ async function chatConAgente({ agente, message, history = [] }) {
   // Las acciones que propone en el chat también quedan para aprobar
   const ins = db.prepare('INSERT INTO eq_acciones (created_at, mision_id, agente, descripcion) VALUES (?,?,?,?)');
   for (const ac of acciones) ins.run(now(), null, agente, ac);
+  guardarChat(agente, 'user', message); guardarChat(agente, 'assistant', texto);
   return { reply: texto, acciones };
 }
 
@@ -448,6 +491,7 @@ function limpiarMisionesColgadas() {
 }
 
 module.exports = {
+  hoyAR, guardarChat, diasDeChat, chatsDelDia, restaurarChat,
   getFoco, setFoco,
   AGENTES, initEquipo, limpiarMisionesColgadas, listarAgentes, chatConAgente,
   crearMision, obtenerMision, listarMisiones, estadoOficina, listarAcciones, decidirAccion
