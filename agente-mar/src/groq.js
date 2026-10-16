@@ -193,4 +193,36 @@ async function complete(systemMsg, userMsg, { json = false, maxTokens = 700, tem
 const cantidadKeys = () => GROQ_KEYS.length;
 console.log(`[groq] ${GROQ_KEYS.length} key(s) de Groq cargada(s)`);
 
-module.exports = { chat, complete, MODULOS, cantidadKeys };
+// Búsqueda en internet con la herramienta browser_search de Groq (modelos gpt-oss).
+// Devuelve un resumen con hechos y una lista de fuentes con URL. Si falla, devuelve '' y el agente sigue sin búsqueda.
+const MODELO_BUSQUEDA = process.env.GROQ_MODEL_BUSQUEDA || 'openai/gpt-oss-120b';
+async function buscarWeb(pregunta, { maxEsperaMs = 60000 } = {}) {
+  const hoy = new Date().toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const body = {
+    model: MODELO_BUSQUEDA,
+    messages: [
+      { role: 'system', content:
+        `Sos investigador. Hoy es ${hoy}. Buscá en internet información ACTUAL y verificable para Argentina sobre lo que se pide. ` +
+        'Priorizá fuentes oficiales (argentina.gob.ar, arca.gob.ar, cnv.gob.ar, boletinoficial.gob.ar, infoleg) y medios especializados reconocidos. ' +
+        'Respondé en español: primero los hechos concretos en viñetas (con fecha o vigencia cuando corresponda), ' +
+        'después "Fuentes:" con la URL de cada dato. Si no encontrás algo, decí "No encontrado" en vez de suponer. No inventes.' },
+      { role: 'user', content: String(pregunta).slice(0, 2000) }
+    ],
+    tools: [{ type: 'browser_search' }],
+    tool_choice: 'required',
+    reasoning_effort: 'low',
+    temperature: 0.2,
+    max_tokens: 3500
+  };
+  try {
+    const res = await fetchGroq(body, { maxEsperaMs });
+    if (!res.ok) { console.error('[buscarWeb] Groq', res.status, (await res.text().catch(() => '')).slice(0, 200)); return ''; }
+    const data = await res.json();
+    return (data.choices?.[0]?.message?.content || '').replace(/【[^】]*】/g, '').trim();
+  } catch (e) {
+    console.error('[buscarWeb]', e.message);
+    return '';
+  }
+}
+
+module.exports = { chat, complete, MODULOS, cantidadKeys, buscarWeb };

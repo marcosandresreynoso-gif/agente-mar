@@ -311,6 +311,7 @@ function descargarMision() {
   let t = `OFICINA MARTOKEN — INFORME DE MISIÓN #${m.id}\n${linea}\n`;
   t += `Fecha: ${f(m.created_at)}   Terminada: ${f(m.finished_at)}\nEstado: ${EST[m.estado] || m.estado}\n\n`;
   t += `PEDIDO DE MARCOS\n${m.pedido}\n\nPLAN DE VICTORIA\n${m.resumen_plan || '-'}\n\n`;
+  if (m.investigacion) t += `${linea}\nINVESTIGACIÓN WEB DEL EQUIPO (con fuentes)\n${linea}\n${m.investigacion}\n\n`;
   if (m.informe) t += `${linea}\nINFORME FINAL (Victoria, Directora de Operaciones)\n${linea}\n${m.informe}\n\n`;
   for (const x of m.tareas) {
     const a = porId[x.agente] || { nombre: x.agente, puesto: '' };
@@ -353,6 +354,7 @@ async function verMision(id) {
             </div>
           </div>`).join('')}
       </div>
+      ${m.investigacion ? `<details class="res" style="margin-top:10px"><summary>🔎 Investigación en internet (con fuentes)</summary><div class="md">${md(m.investigacion)}</div></details>` : ''}
       ${m.informe ? `<div class="informe"><div class="section-t" style="margin:0 0 6px">Informe de Victoria</div><div class="md">${md(m.informe)}</div></div>` : ''}
       ${m.error ? `<div class="informe" style="border-color:var(--err);background:rgba(239,107,107,.08)">No se pudo terminar: ${esc(m.error)}</div>` : ''}
       ${!enCurso && m.tareas.some((t) => t.resultado) ? `<button class="btn small" style="margin-top:12px" onclick="descargarMision()">⬇ Descargar informe completo</button>` : ''}
