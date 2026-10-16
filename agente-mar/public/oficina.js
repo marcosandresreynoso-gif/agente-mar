@@ -302,11 +302,32 @@ async function encargar() {
   } catch (e) { $('misionMsg').textContent = e.message; }
   $('btnMision').disabled = false;
 }
+let misionDatos = null;
+// Informe completo de una misión: pedido, plan, trabajo de cada agente, informe final y acciones, con fechas
+function descargarMision() {
+  const m = misionDatos; if (!m) return;
+  const f = (iso) => iso ? new Date(iso).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+  const linea = '='.repeat(60);
+  let t = `OFICINA MARTOKEN — INFORME DE MISIÓN #${m.id}\n${linea}\n`;
+  t += `Fecha: ${f(m.created_at)}   Terminada: ${f(m.finished_at)}\nEstado: ${EST[m.estado] || m.estado}\n\n`;
+  t += `PEDIDO DE MARCOS\n${m.pedido}\n\nPLAN DE VICTORIA\n${m.resumen_plan || '-'}\n\n`;
+  if (m.informe) t += `${linea}\nINFORME FINAL (Victoria, Directora de Operaciones)\n${linea}\n${m.informe}\n\n`;
+  for (const x of m.tareas) {
+    const a = porId[x.agente] || { nombre: x.agente, puesto: '' };
+    t += `${linea}\n${a.nombre.toUpperCase()} — ${a.puesto}\nTarea: ${x.tarea}\nTerminó: ${f(x.finished_at)}\n${linea}\n${x.resultado || '(sin resultado)'}\n\n`;
+  }
+  if (m.acciones.length) t += `${linea}\nACCIONES PROPUESTAS\n` + m.acciones.map((a) => `- [${a.estado}] ${porId[a.agente]?.nombre || a.agente}: ${a.descripcion}`).join('\n') + '\n';
+  const dia = new Date(m.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const url = URL.createObjectURL(new Blob([t], { type: 'text/plain;charset=utf-8' }));
+  const link = document.createElement('a'); link.href = url; link.download = `informe-mision-${m.id}-${dia}.txt`;
+  document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
 async function verMision(id) {
   misionVista = id; clearTimeout(timerMision);
   let m;
   try { m = await api('/api/admin/equipo/mision/' + id); } catch (e) { $('misionActual').innerHTML = `<div class="card muted">${esc(e.message)}</div>`; return; }
   if (misionVista !== id) return;
+  misionDatos = m;
   const enCurso = m.estado === 'planificando' || m.estado === 'trabajando';
   $('misionActual').innerHTML = `
     <div class="card">
@@ -334,6 +355,7 @@ async function verMision(id) {
       </div>
       ${m.informe ? `<div class="informe"><div class="section-t" style="margin:0 0 6px">Informe de Victoria</div><div class="md">${md(m.informe)}</div></div>` : ''}
       ${m.error ? `<div class="informe" style="border-color:var(--err);background:rgba(239,107,107,.08)">No se pudo terminar: ${esc(m.error)}</div>` : ''}
+      ${!enCurso && m.tareas.some((t) => t.resultado) ? `<button class="btn small" style="margin-top:12px" onclick="descargarMision()">⬇ Descargar informe completo</button>` : ''}
       ${m.acciones.length ? `<div class="muted" style="margin-top:10px">Esta misión dejó ${m.acciones.length} acción(es) para que apruebes (columna de la derecha).</div>` : ''}
     </div>`;
   if (enCurso) timerMision = setTimeout(() => { verMision(id); cargarOficina().catch(() => {}); }, 4000);
