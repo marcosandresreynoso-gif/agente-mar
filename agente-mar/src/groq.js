@@ -148,6 +148,34 @@ async function chat({ modulo = 'todos', message, history = [], extra = '', maxTo
 }
 
 // Llamada genérica al modelo (para extracción de leads y reportes)
+// Groq gratis limita los tokens por minuto POR PEDIDO (gpt-oss-120b: 8000, contando texto enviado + max_tokens).
+// Si el pedido es más grande, Groq responde 413 y la tarea se pierde. Por eso se recorta ANTES de enviar.
+const LIMITE_TPM = parseInt(process.env.GROQ_TPM_LIMIT, 10) || 7600;
+const estimarTokens = (t) => Math.ceil(String(t || '').length / 3);   // estimación conservadora para español
+// Recorta un texto largo dejando el principio y el final (lo del medio suele ser lo menos importante)
+function recortar(texto, maxChars) {
+  const t = String(texto || '');
+  if (t.length <= maxChars) return t;
+  const cabeza = Math.floor(maxChars * 0.7), cola = maxChars - cabeza - 40;
+  return t.slice(0, cabeza) + '\n[…texto recortado para no exceder el límite…]\n' + t.slice(t.length - Math.max(cola, 0));
+}
+function ajustarAlLimite(body, factor = 1) {
+  const limite = Math.floor(LIMITE_TPM * factor);
+  const msgs = body.messages;
+  const total = () => msgs.reduce((n, m) => n + estimarTokens(m.content), 0) + body.max_tokens;
+  if (total() <= limite) return false;
+  // 1º: el mensaje del usuario (trabajo de compañeros, pedido); 2º: el system (documentación al final)
+  for (const idx of [1, 0]) {
+    const sobra = total() - limite;
+    if (sobra <= 0) break;
+    const m = msgs[idx];
+    const nuevo = Math.max(m.content.length - sobra * 3 - 200, idx === 0 ? 4000 : 1500);
+    m.content = recortar(m.content, nuevo);
+  }
+  if (total() > limite) body.max_tokens = Math.max(limite - (total() - body.max_tokens), 900);
+  return true;
+}
+
 async function complete(systemMsg, userMsg, { json = false, maxTokens = 700, temperature = 0.1, maxEsperaMs = 15000 } = {}) {
   const body = {
     model: MODEL,
@@ -166,8 +194,16 @@ async function complete(systemMsg, userMsg, { json = false, maxTokens = 700, tem
     body.max_tokens = Math.max(maxTokens + 1500, 2000);
   }
   if (json) body.response_format = { type: 'json_object' };
+  if (ajustarAlLimite(body)) console.warn('[groq] pedido recortado para no exceder el límite de tokens');
 
   let res = await fetchGroq(body, { maxEsperaMs });
+  if (!res.ok && res.status === 413) {
+    // Igual se pasó: se recorta más fuerte y se reintenta una vez
+    const t = await res.text().catch(() => '');
+    console.warn('[groq] 413 (pedido muy grande), reintento recortado:', t.slice(0, 160));
+    ajustarAlLimite(body, 0.7);
+    res = await fetchGroq(body, { maxEsperaMs });
+  }
   if (!res.ok && res.status === 400 && json) {
     // Segundo intento sin el modo JSON estricto; el JSON se extrae del texto.
     const t = await res.text().catch(() => '');
@@ -263,4 +299,4 @@ async function buscarWeb(pregunta, { maxEsperaMs = 60000 } = {}) {
   }
 }
 
-module.exports = { chat, complete, MODULOS, cantidadKeys, buscarWeb, verificarFuentes };
+module.exports = { chat, complete, MODULOS, cantidadKeys, buscarWeb, verificarFuentes, recortar };
