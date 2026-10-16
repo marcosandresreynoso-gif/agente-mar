@@ -6,7 +6,12 @@ let KEY = leer('mar_admin');
 let AGENTES = [];
 let porId = {};
 let agenteAbierto = null;
-const chats = {};           // historial de chat por agente (solo en esta pestaña)
+const chats = {};           // chats de HOY por agente (se guardan en el servidor y en el dispositivo)
+const hoyAR = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+let HOY = hoyAR();
+let DIAS = [];              // [{dia, agente, n}] días con chats guardados en el servidor
+let diaVista = HOY;         // día que se está mirando en el chat abierto
+let chatViejo = null;       // mensajes del día anterior que se está mirando
 let misionVista = null;     // id de la misión que se muestra
 let timerMision = null;
 
@@ -143,6 +148,7 @@ function abrirFicha(id) {
     <h5>Herramientas</h5><div class="chips">${a.herramientas.map((h) => `<span class="chip">${esc(h)}</span>`).join('')}</div>
     <h5>Autonomía</h5><p style="margin:0;font-size:14px">${esc(a.autonomia)}</p>
     <p class="muted" style="margin-top:14px">Ningún agente envía, publica, paga ni firma solo: todo lo que proponga queda en “Esperan tu aprobación”.</p>`;
+  diaVista = HOY; chatViejo = null; armarSelectorDias();
   pintarChat(); tab('perfil');
   $('ficha').classList.add('open'); $('fichaBg').classList.add('open');
 }
@@ -155,7 +161,11 @@ function tab(t) {
   if (t === 'chat') setTimeout(() => $('chatTxt').focus(), 50);
 }
 function pintarChat() {
-  const h = chats[agenteAbierto] || [];
+  guardarLocal();
+  const viendoHoy = diaVista === HOY;
+  $('chatAviso').style.display = viendoHoy ? 'none' : 'block';
+  $('chatIn').style.visibility = viendoHoy ? 'visible' : 'hidden';
+  const h = viendoHoy ? (chats[agenteAbierto] || []) : (chatViejo || []);
   const a = porId[agenteAbierto];
   $('msgs').innerHTML = h.length
     ? h.map((m) => `<div class="msg ${m.role === 'user' ? 'me' : 'ag'} md">${m.role === 'user' ? esc(m.content) : md(m.content)}</div>`).join('')
@@ -196,6 +206,7 @@ async function seguirMisionEnChat(agenteId, misionId) {
       let inf = '## Informe\n' + (m.informe || '');
       if (m.acciones.length) inf += `\n\n(${m.acciones.length} acción(es) para aprobar en “Esperan tu aprobación”.)`;
       h.push({ role: 'assistant', content: inf });
+      post('/api/admin/equipo/chats/agregar', { agente: agenteId, role: 'assistant', content: inf }).catch(() => {});
       cargarAcciones(); cargarHistorial();
       if (agenteAbierto === agenteId) pintarChat();
       return;
@@ -207,6 +218,77 @@ async function seguirMisionEnChat(agenteId, misionId) {
     }
     if (agenteAbierto === agenteId) pintarChat();
   }
+}
+
+/* ---------- historial por día ---------- */
+const fechaLarga = (d) => new Date(d + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+// Copia en el dispositivo (sirve de respaldo si el servidor se borra con un deploy)
+function guardarLocal() {
+  try {
+    const todo = JSON.parse(localStorage.getItem('oficina_chats') || '{}');
+    const delDia = {};
+    for (const [ag, msgs] of Object.entries(chats)) if (msgs.length) delDia[ag] = msgs.map((m) => ({ role: m.role, content: m.content }));
+    if (Object.keys(delDia).length) todo[HOY] = delDia;
+    const dias = Object.keys(todo).sort().reverse().slice(0, 90);   // últimos 90 días
+    localStorage.setItem('oficina_chats', JSON.stringify(Object.fromEntries(dias.map((d) => [d, todo[d]]))));
+  } catch (e) {}
+}
+function leerLocal() { try { return JSON.parse(localStorage.getItem('oficina_chats') || '{}'); } catch (e) { return {}; } }
+
+async function sincronizarChats() {
+  const r = await api('/api/admin/equipo/chats/dias');
+  HOY = r.hoy || hoyAR(); diaVista = HOY;
+  const enServidor = new Set(r.dias.map((x) => x.dia + '|' + x.agente));
+  // Subir lo que el dispositivo tiene y el servidor perdió
+  const local = leerLocal(); let subidos = 0;
+  for (const [dia, porAg] of Object.entries(local)) {
+    for (const [ag, msgs] of Object.entries(porAg || {})) {
+      if (!enServidor.has(dia + '|' + ag) && Array.isArray(msgs) && msgs.length) {
+        try { await post('/api/admin/equipo/chats/restaurar', { dia, agente: ag, mensajes: msgs }); subidos++; } catch (e) {}
+      }
+    }
+  }
+  DIAS = subidos ? (await api('/api/admin/equipo/chats/dias')).dias : r.dias;
+  // Bajar al dispositivo los días que tiene el servidor y el dispositivo no (copia completa, últimos 90 días)
+  try {
+    const todo = leerLocal(); let cambio = false;
+    const faltan = [...new Set(DIAS.filter((x) => x.dia !== HOY && !(todo[x.dia] && todo[x.dia][x.agente])).map((x) => x.dia))].slice(0, 90);
+    for (const dia of faltan) {
+      const c = (await api('/api/admin/equipo/chats?dia=' + dia)).chats || {};
+      todo[dia] = { ...(todo[dia] || {}), ...c }; cambio = true;
+    }
+    if (cambio) localStorage.setItem('oficina_chats', JSON.stringify(todo));
+  } catch (e) {}
+  const hoy = await api('/api/admin/equipo/chats?dia=' + HOY);
+  for (const k of Object.keys(chats)) delete chats[k];
+  Object.assign(chats, hoy.chats || {});
+}
+function armarSelectorDias() {
+  const dias = DIAS.filter((x) => x.agente === agenteAbierto && x.dia !== HOY).map((x) => x.dia);
+  $('chatDia').innerHTML = `<option value="${HOY}">Hoy · ${fechaLarga(HOY)}</option>` +
+    dias.map((d) => `<option value="${d}">${fechaLarga(d)}</option>`).join('');
+  $('chatDia').value = diaVista;
+}
+async function cambiarDia() {
+  diaVista = $('chatDia').value; chatViejo = null;
+  if (diaVista !== HOY) {
+    $('msgs').innerHTML = '<div class="muted">Cargando…</div>';
+    try { chatViejo = ((await api('/api/admin/equipo/chats?dia=' + diaVista)).chats || {})[agenteAbierto] || []; }
+    catch (e) { chatViejo = (leerLocal()[diaVista] || {})[agenteAbierto] || []; }
+  }
+  pintarChat();
+}
+function descargarDia() {
+  const a = porId[agenteAbierto]; if (!a) return;
+  const msgs = diaVista === HOY ? (chats[agenteAbierto] || []) : (chatViejo || []);
+  if (!msgs.length) return;
+  const txt = `Oficina Martoken — Chat con ${a.nombre} (${a.puesto})\nDía: ${fechaLarga(diaVista)}\n\n` +
+    msgs.map((m) => `${m.role === 'user' ? 'Marcos' : a.nombre}:\n${m.content}\n`).join('\n');
+  const url = URL.createObjectURL(new Blob([txt], { type: 'text/plain;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url; link.download = `chat-${a.nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()}-${diaVista}.txt`;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 /* ---------- misiones ---------- */
@@ -285,7 +367,7 @@ async function iniciar() {
   $('login').style.display = 'none'; $('app').style.display = 'block';
   try {
     await cargarOficina();
-    await Promise.all([cargarHistorial(), cargarAcciones()]);
+    await Promise.all([cargarHistorial(), cargarAcciones(), sincronizarChats().catch(() => {})]);
     const ult = (await api('/api/admin/equipo/misiones'))[0];
     if (ult) verMision(ult.id);
   } catch (e) { $('estadoGral').textContent = e.message; }
@@ -303,6 +385,8 @@ $('pedido').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKe
 $('fCerrar').onclick = cerrarFicha; $('fichaBg').onclick = cerrarFicha;
 document.querySelectorAll('.ftab').forEach((t) => t.onclick = () => tab(t.dataset.t));
 $('chatEnviar').onclick = enviarChat;
+$('chatDia').onchange = cambiarDia;
+$('chatBajar').onclick = descargarDia;
 $('chatTxt').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarChat(); } };
 setInterval(() => { if (KEY && !document.hidden) { cargarOficina().catch(() => {}); } }, 20000);
 

@@ -468,6 +468,19 @@ app.post('/api/admin/equipo/mision', requireAdmin, (req, res) => {
   }
 });
 
+// Historial de chats por día
+app.get('/api/admin/equipo/chats/dias', requireAdmin, (req, res) => res.json({ hoy: equipo.hoyAR(), dias: equipo.diasDeChat() }));
+app.get('/api/admin/equipo/chats', requireAdmin, (req, res) => res.json(equipo.chatsDelDia(req.query.dia)));
+app.post('/api/admin/equipo/chats/agregar', requireAdmin, (req, res) => {
+  const { agente, role, content } = req.body || {};
+  equipo.guardarChat(agente, role, content);
+  res.json({ ok: true });
+});
+app.post('/api/admin/equipo/chats/restaurar', requireAdmin, (req, res) => {
+  const { dia, agente, mensajes } = req.body || {};
+  res.json({ ok: true, restaurados: equipo.restaurarChat(dia, agente, mensajes) });
+});
+
 app.get('/api/admin/equipo/misiones', requireAdmin, (req, res) => res.json(equipo.listarMisiones()));
 
 app.get('/api/admin/equipo/mision/:id', requireAdmin, (req, res) => {
