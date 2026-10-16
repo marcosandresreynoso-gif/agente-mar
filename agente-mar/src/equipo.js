@@ -293,6 +293,7 @@ const REGLAS_COMUNES =
   '- PRESUPUESTO: no propongas montos de publicidad ni gastos concretos si Marcos no dio su presupuesto. Pedíselo, o proponé cómo repartir el que tenga.\n' +
   '- FUERA DE ARGENTINA: toda publicidad, captación u oferta de tokens a personas de otros países (EE.UU., España, etc.) se marca "⚖️ REQUIERE CONSULTA LEGAL PREVIA". En EE.UU., ofrecer tokens de inversión al público puede ser oferta de valores regulada por la SEC. No lo propongas como algo para hacer ya.\n' +
   '- No propongas pedir difusión a empresas competidoras (plataformas de inversión inmobiliaria o cripto) ni a gobiernos extranjeros. No nombres empresas sin verificar que existan y sigan activas.\n' +
+  '- CNV: MARTOKEN HOY NO hace oferta pública, NO está en el sandbox de tokenización de la CNV y sus tokens NO son valores negociables autorizados. Nunca digas que MARTOKEN "cumple", "está autorizado" o que la CNV "permite su estructura actual". No inventes estados contables, alquileres ni ingresos que Marcos no informó.\n' +
   '- CONTACTO OFICIAL: martokenoficial@gmail.com y el WhatsApp de MARTOKEN. No inventes otros emails.\n' +
   '- LINKS CON SEGUIMIENTO (UTM): los parámetros van ANTES del #. Ejemplo correcto: https://www.martoken.com.ar/?utm_source=facebook&utm_campaign=mar50#mar50\n' +
   '- Sin urgencia falsa: nada de contadores, "últimos cupos" ni "cupos limitados" si no es real.\n' +
@@ -329,7 +330,10 @@ const REGLA_NOVEDADES =
   'Si la investigación dice "No encontrado", decí claramente "Hoy no encontré novedades confirmadas sobre X" y NO rellenes con normas viejas ni con lo que sabés de memoria. ' +
   'Filtrá por lo que afecta a MARTOKEN: fideicomisos, tokenización, CNV (oferta pública, PSAV), inmuebles, Ganancias, Bienes Personales y Sellos de personas humanas, ' +
   'facturación de Marcos como persona humana. Regímenes para grandes empresas (RIGI, grandes contribuyentes, comercio exterior) o de otras provincias: no aplican, no los propongas. ' +
-  'Cada novedad: fecha, qué cambió en 1 línea, fuente, y "Impacto para MARTOKEN: …" (o "sin impacto").\n';
+  'Cada novedad: fecha, qué cambió en 1 línea, fuente, y "Impacto para MARTOKEN: …" (o "sin impacto").\n' +
+  'TOKENIZACIÓN CNV: el Capítulo I, Sección II del Título XII de las NORMAS de la CNV es el régimen de TOKENIZACIÓN (representación digital de valores negociables y sandbox). ' +
+  'Cualquier resolución o consulta pública sobre eso es RELEVANTE para MARTOKEN, aunque sea una consulta: decí de qué trata, la fecha límite para opinar y recomendá leerla. Nunca la marques "sin impacto".\n' +
+  'No afirmes que "no hubo cambios" en un tema (UIF, ARCA, etc.) si la investigación web no lo buscó: decí "no lo revisé".\n';
 const ES_IMPOSITIVO = /impuest|imposit|fiscal|tribut|arca|afip|ganancia|bienes personales|sellos|escritur|inocencia|exenci|declara/i;
 
 function promptAgente(id, consulta, investigacion = '') {
