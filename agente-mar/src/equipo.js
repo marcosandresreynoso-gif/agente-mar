@@ -12,6 +12,7 @@
 const { db, getConfig, setConfig } = require('./db');
 const { complete, cantidadKeys, buscarWeb } = require('./groq');
 const rag = require('./rag');
+const { controlarYAnotar } = require('./control');
 
 const now = () => new Date().toISOString();
 
@@ -280,6 +281,11 @@ function datosDelSistema(tipo) {
 const REGLAS_COMUNES =
   'Reglas del equipo:\n' +
   '- Español rioplatense, directo y sin relleno. Usá títulos cortos y viñetas cuando ayuden.\n' +
+  '- MENSAJES HACIA AFUERA (WhatsApp, mails, posts, cartas a municipios o empresas): se firman SIEMPRE como "Marcos Reynoso – MARTOKEN" y se escriben en primera persona de Marcos. NUNCA te presentes ni firmes con tu nombre de agente: los agentes son internos y nadie de afuera los conoce.\n' +
+  '- Página web: SIEMPRE https://www.martoken.com.ar (con .com.ar). MAR-50: https://www.martoken.com.ar/#mar50 · MAR-01: https://www.martoken.com.ar/mar01/\n' +
+  '- MAR-50: NUNCA pongas la cantidad de viviendas (nada de "50 viviendas"), ni monto de la emisión, ni porcentaje de renta, ni "en General Villegas".\n' +
+  '- ORGANIZACIONES Y EMPRESAS: nombrá solo las que estén en la documentación o en la investigación web con su URL. Si sugerís otras, escribí el tipo ("cooperativas eléctricas de la zona") y no inventes nombres propios. Si nombrás una sin fuente, marcala "(a verificar)".\n' +
+  '- Zona: salvo que Marcos pida otra cosa, priorizá General Villegas y el oeste bonaerense (la región de MARTOKEN) antes que ciudades lejanas.\n' +
   '- NO uses tablas: Marcos lee desde el celular. Presentá todo en listas o párrafos cortos, uno debajo del otro.\n' +
   '- Trabajás en ARGENTINA. El organismo fiscal es ARCA (ex AFIP). No uses impuestos ni normas de otros países (por ejemplo "ITP" es de España).\n' +
   '- Si recibís una "INVESTIGACIÓN WEB", usala para datos actuales y citá la fuente (URL) de cada dato que tomes de ahí. Si un dato no está ni en la documentación ni en la investigación, decí que no lo encontraste: no lo inventes.\n' +
@@ -383,7 +389,8 @@ async function chatConAgente({ agente, message, history = [] }) {
   const user = (hist ? `Conversación hasta ahora:\n${hist}\n\n` : '') + `Marcos: ${String(message).slice(0, 4000)}`;
   const investigacion = NECESITA_BUSQUEDA.test(message) ? await buscarWeb(`${message}\n(Contexto: MARTOKEN, tokenización inmobiliaria en Argentina, fideicomiso, tokens en Polygon.)`) : '';
   const out = await complete(promptAgente(agente, message, investigacion), user, { maxTokens: 1000, temperature: 0.4, maxEsperaMs: 45000 });
-  const { texto, acciones } = separarAcciones(out);
+  const sep = separarAcciones(out);
+  const texto = controlarYAnotar(sep.texto), acciones = sep.acciones;
   // Las acciones que propone en el chat también quedan para aprobar
   const ins = db.prepare('INSERT INTO eq_acciones (created_at, mision_id, agente, descripcion) VALUES (?,?,?,?)');
   for (const ac of acciones) ins.run(now(), null, agente, ac);
@@ -443,7 +450,8 @@ async function ejecutarMision(misionId) {
           : '';
         const user = `Pedido original de Marcos: ${m.pedido}\n\nTu tarea: ${t.tarea}${previo}`;
         const out = await complete(promptAgente(t.agente, `${m.pedido} ${t.tarea}`, investigacion), user, { maxTokens: 1100, temperature: 0.4, maxEsperaMs: 90000 });
-        const { texto, acciones } = separarAcciones(out);
+        const sep = separarAcciones(out);
+        const texto = controlarYAnotar(sep.texto), acciones = sep.acciones;
         for (const ac of acciones) insA.run(now(), misionId, t.agente, ac);
         db.prepare('UPDATE eq_tareas SET estado = ?, resultado = ?, finished_at = ? WHERE id = ?').run('lista', texto, now(), t.id);
         hechos.push({ nombre: AGENTES[t.agente].nombre, puesto: AGENTES[t.agente].puesto, texto });
@@ -459,7 +467,7 @@ async function ejecutarMision(misionId) {
         '\nAhora escribí el INFORME FINAL para Marcos: conclusión en 2-3 líneas, lo más importante de cada área, ' +
         'y próximos pasos numerados. Máximo 300 palabras. No repitas todo: sintetizá. No incluyas sección de acciones propuestas.';
       const user = `Pedido: ${m.pedido}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 3000)}`).join('\n\n');
-      informe = separarAcciones(await complete(sys, user, { maxTokens: 800, temperature: 0.3, maxEsperaMs: 90000 })).texto;
+      informe = controlarYAnotar(separarAcciones(await complete(sys, user, { maxTokens: 800, temperature: 0.3, maxEsperaMs: 90000 })).texto);
     } else if (hechos.length === 1) {
       informe = hechos[0].texto;
     } else {
