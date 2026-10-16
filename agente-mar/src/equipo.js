@@ -10,7 +10,7 @@
 // pagar, firmar). Solo las PROPONEN y quedan pendientes hasta que Marcos las aprueba en el panel.
 
 const { db, getConfig, setConfig } = require('./db');
-const { complete, cantidadKeys, buscarWeb } = require('./groq');
+const { complete, cantidadKeys, buscarWeb, recortar } = require('./groq');
 const rag = require('./rag');
 const { controlarYAnotar } = require('./control');
 
@@ -286,6 +286,14 @@ const REGLAS_COMUNES =
   '- MAR-50: NUNCA pongas la cantidad de viviendas (nada de "50 viviendas"), ni monto de la emisión, ni porcentaje de renta, ni "en General Villegas".\n' +
   '- ORGANIZACIONES Y EMPRESAS: nombrá solo las que estén en la documentación o en la investigación web con su URL. Si sugerís otras, escribí el tipo ("cooperativas eléctricas de la zona") y no inventes nombres propios. Si nombrás una sin fuente, marcala "(a verificar)".\n' +
   '- Zona: salvo que Marcos pida otra cosa, priorizá General Villegas y el oeste bonaerense (la región de MARTOKEN) antes que ciudades lejanas.\n' +
+  '- DATOS: NUNCA afirmes resultados, métricas o situaciones (CPL, clics, leads, preinscriptos, ventas, "la campaña está funcionando") que Marcos no informó y que no están en DATOS ACTUALES DEL SISTEMA. Si no hay datos, escribí "sin datos todavía" y pedí cuáles necesitás.\n' +
+  '- PRESUPUESTO: no propongas montos de publicidad ni gastos concretos si Marcos no dio su presupuesto. Pedíselo, o proponé cómo repartir el que tenga.\n' +
+  '- FUERA DE ARGENTINA: toda publicidad, captación u oferta de tokens a personas de otros países (EE.UU., España, etc.) se marca "⚖️ REQUIERE CONSULTA LEGAL PREVIA". En EE.UU., ofrecer tokens de inversión al público puede ser oferta de valores regulada por la SEC. No lo propongas como algo para hacer ya.\n' +
+  '- No propongas pedir difusión a empresas competidoras (plataformas de inversión inmobiliaria o cripto) ni a gobiernos extranjeros. No nombres empresas sin verificar que existan y sigan activas.\n' +
+  '- CONTACTO OFICIAL: martokenoficial@gmail.com y el WhatsApp de MARTOKEN. No inventes otros emails.\n' +
+  '- LINKS CON SEGUIMIENTO (UTM): los parámetros van ANTES del #. Ejemplo correcto: https://www.martoken.com.ar/?utm_source=facebook&utm_campaign=mar50#mar50\n' +
+  '- Sin urgencia falsa: nada de contadores, "últimos cupos" ni "cupos limitados" si no es real.\n' +
+  '- Idioma: las piezas van en español rioplatense. Si el público no habla español, avisá que hace falta traducción en vez de mandar el texto en español.\n' +
   '- NO uses tablas: Marcos lee desde el celular. Presentá todo en listas o párrafos cortos, uno debajo del otro.\n' +
   '- Trabajás en ARGENTINA. El organismo fiscal es ARCA (ex AFIP). No uses impuestos ni normas de otros países (por ejemplo "ITP" es de España).\n' +
   '- Si recibís una "INVESTIGACIÓN WEB", usala para datos actuales y citá la fuente (URL) de cada dato que tomes de ahí. Si un dato no está ni en la documentación ni en la investigación, decí que no lo encontraste: no lo inventes.\n' +
@@ -417,6 +425,11 @@ async function planificar(pedido) {
     .filter((t) => t && AGENTES[t.agente] && t.agente !== 'directora' && t.tarea)
     .slice(0, 4);
   if (!tareas.length) tareas = [{ agente: 'analista', tarea: pedido }];
+  // Todo lo que va a publicidad, captación o inversores pasa SIEMPRE por Cumplimiento, al final
+  if (/publicidad|anuncio|campa[ñn]a|publicar|post|carrusel|video|inversor|captaci|difusi[oó]n|marketing|exterior|EE\.?\s?UU|Estados Unidos/i.test(pedido)) {
+    tareas = tareas.filter((t) => t.agente !== 'cumplimiento');
+    tareas.push({ agente: 'cumplimiento', tarea: 'Revisá TODO lo que hicieron tus compañeros: promesas de rentabilidad, datos inventados, normas (CNV/ARCA), captación fuera de Argentina, urgencia falsa, links y firmas. Indicá qué corregir antes de publicar.' });
+  }
   return { resumen: (plan && plan.resumen) || 'Organizo el pedido con el equipo.', tareas };
 }
 
@@ -442,36 +455,68 @@ async function ejecutarMision(misionId) {
     const hechos = [];
     const insA = db.prepare('INSERT INTO eq_acciones (created_at, mision_id, agente, descripcion) VALUES (?,?,?,?)');
 
+    // Lo que hicieron los compañeros: se reparte un máximo de 9.000 caracteres entre todos (para no pasar el límite de Groq)
+    const contextoPrevio = (lista, total) => {
+      if (!lista.length) return '';
+      const porUno = Math.floor(total / lista.length);
+      return '\n\nLo que ya hicieron tus compañeros en esta misión:\n' +
+        lista.map((h) => `### ${h.nombre} (${h.puesto})\n${recortar(h.texto, porUno)}`).join('\n\n');
+    };
+    const fallidas = [];
+
     for (const t of tareas) {
       db.prepare('UPDATE eq_tareas SET estado = ?, started_at = ? WHERE id = ?').run('trabajando', now(), t.id);
-      try {
-        const previo = hechos.length
-          ? '\n\nLo que ya hicieron tus compañeros en esta misión:\n' + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 5000)}`).join('\n\n')
-          : '';
-        const user = `Pedido original de Marcos: ${m.pedido}\n\nTu tarea: ${t.tarea}${previo}`;
-        const out = await complete(promptAgente(t.agente, `${m.pedido} ${t.tarea}`, investigacion), user, { maxTokens: 1100, temperature: 0.4, maxEsperaMs: 90000 });
-        const sep = separarAcciones(out);
-        const texto = controlarYAnotar(sep.texto), acciones = sep.acciones;
-        for (const ac of acciones) insA.run(now(), misionId, t.agente, ac);
-        db.prepare('UPDATE eq_tareas SET estado = ?, resultado = ?, finished_at = ? WHERE id = ?').run('lista', texto, now(), t.id);
-        hechos.push({ nombre: AGENTES[t.agente].nombre, puesto: AGENTES[t.agente].puesto, texto });
-      } catch (e) {
-        db.prepare('UPDATE eq_tareas SET estado = ?, resultado = ?, finished_at = ? WHERE id = ?').run('error', e.message, now(), t.id);
+      let hecho = false, ultimoError = '';
+      // Hasta 2 intentos: el segundo con menos contexto y después de una pausa
+      for (const intento of [1, 2]) {
+        try {
+          const user = `Pedido original de Marcos: ${m.pedido}\n\nTu tarea: ${t.tarea}${contextoPrevio(hechos, intento === 1 ? 9000 : 3500)}`;
+          const inv = intento === 1 ? investigacion : recortar(investigacion, 2000);
+          const out = await complete(promptAgente(t.agente, `${m.pedido} ${t.tarea}`, inv), user, { maxTokens: 1100, temperature: 0.4, maxEsperaMs: 90000 });
+          if (!out || !out.trim()) throw new Error('respuesta vacía');
+          const sep = separarAcciones(out);
+          const texto = controlarYAnotar(sep.texto), acciones = sep.acciones;
+          for (const ac of acciones) insA.run(now(), misionId, t.agente, ac);
+          db.prepare('UPDATE eq_tareas SET estado = ?, resultado = ?, finished_at = ? WHERE id = ?').run('lista', texto, now(), t.id);
+          hechos.push({ nombre: AGENTES[t.agente].nombre, puesto: AGENTES[t.agente].puesto, texto });
+          hecho = true;
+          break;
+        } catch (e) {
+          ultimoError = e.message;
+          console.error(`[equipo] ${t.agente} intento ${intento}:`, e.message.slice(0, 200));
+          if (intento === 1) await new Promise((r) => setTimeout(r, 15000));
+        }
+      }
+      if (!hecho) {
+        const aviso = `⚠️ ${AGENTES[t.agente].nombre} (${AGENTES[t.agente].puesto}) no pudo completar su tarea después de 2 intentos. ` +
+          'Volvé a pedírsela por su chat en unos minutos.\n\nDetalle técnico: ' + ultimoError.slice(0, 300);
+        db.prepare('UPDATE eq_tareas SET estado = ?, resultado = ?, finished_at = ? WHERE id = ?').run('error', aviso, now(), t.id);
+        fallidas.push(`${AGENTES[t.agente].nombre} (${AGENTES[t.agente].puesto})`);
       }
     }
 
     // Informe final de la Directora
     let informe = '';
+    const avisoFallas = fallidas.length
+      ? `\n\n⚠️ **No terminaron su parte:** ${fallidas.join(', ')}. Su revisión NO está incluida en este informe: pediles la tarea de nuevo antes de usar este material.`
+      : '';
     if (hechos.length > 1) {
-      const sys = promptAgente('directora', m.pedido, investigacion) +
+      const sys = promptAgente('directora', m.pedido, recortar(investigacion, 2500)) +
         '\nAhora escribí el INFORME FINAL para Marcos: conclusión en 2-3 líneas, lo más importante de cada área, ' +
-        'y próximos pasos numerados. Máximo 300 palabras. No repitas todo: sintetizá. No incluyas sección de acciones propuestas.';
-      const user = `Pedido: ${m.pedido}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${h.texto.slice(0, 3000)}`).join('\n\n');
-      informe = controlarYAnotar(separarAcciones(await complete(sys, user, { maxTokens: 800, temperature: 0.3, maxEsperaMs: 90000 })).texto);
+        'y próximos pasos numerados. Máximo 300 palabras. No repitas todo: sintetizá. No incluyas sección de acciones propuestas.\n' +
+        'PROHIBIDO inventar resultados, métricas o situaciones (CPL, leads, inscriptos, ventas, "la campaña está generando…"): ' +
+        'usá SOLO lo que dijo Marcos en su pedido y lo que hizo el equipo. Si faltan datos, decilo y pedilos.' +
+        (fallidas.length ? `\nIMPORTANTE: ${fallidas.join(', ')} no pudo/pudieron completar su tarea. Decilo claramente en el informe.` : '');
+      const user = `Pedido: ${m.pedido}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${recortar(h.texto, Math.floor(9000 / hechos.length))}`).join('\n\n');
+      try {
+        informe = controlarYAnotar(separarAcciones(await complete(sys, user, { maxTokens: 800, temperature: 0.3, maxEsperaMs: 90000 })).texto) + avisoFallas;
+      } catch (e) {
+        informe = '⚠️ Victoria no pudo escribir el informe final (' + e.message.slice(0, 150) + '). Abajo tenés el trabajo de cada agente completo.' + avisoFallas;
+      }
     } else if (hechos.length === 1) {
-      informe = hechos[0].texto;
+      informe = hechos[0].texto + avisoFallas;
     } else {
-      throw new Error('Ningún agente pudo completar su tarea.');
+      throw new Error('Ningún agente pudo completar su tarea. Probá de nuevo en unos minutos.');
     }
     upd({ estado: 'terminada', informe, finished_at: now() });
   } catch (e) {
