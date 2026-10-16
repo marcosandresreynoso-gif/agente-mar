@@ -7,7 +7,7 @@ Toda pieza que hable de impuestos cierra con: "Información general. Consultá t
 
 ---
 
-## VENTAJA IMPOSITIVA 1 — Sin gastos ni impuestos de escritura para entrar
+## VENTAJA IMPOSITIVA 1 — Gastos de escritura incluidos
 
 Comprar un inmueble de forma directa obliga a escriturar, y eso tiene costos e impuestos:
 - Impuesto de Sellos: en Provincia de Buenos Aires 2% del valor (en general se divide: 1% comprador y 1% vendedor). En CABA 2,7% (3,5% en valores altos).
@@ -17,9 +17,10 @@ Comprar un inmueble de forma directa obliga a escriturar, y eso tiene costos e i
 Con MARTOKEN el inversor compra tokens: NO escritura a su nombre ni paga escribano para entrar.
 El terreno se escritura UNA sola vez, a nombre del fideicomiso, y ese costo se reparte en el proyecto: el inversor lo paga indirectamente y en proporción, no es que no exista.
 
-Cómo decirlo:
-- "Invertís en ladrillos sin pagar escritura ni escribano: el inmueble se escritura una sola vez, a nombre del fideicomiso."
-- "En una compra tradicional, sellos y escritura suman entre 3% y 4% del precio. Con MARTOKEN no escriturás a tu nombre: el inmueble se escritura una sola vez y el costo se reparte en el proyecto."
+Cómo decirlo (aprobado por Marcos):
+- "Gastos de escritura incluidos: el inmueble se escritura una sola vez, a nombre del fideicomiso, y ese costo ya está dentro del valor del token. En una compra tradicional, sellos y escritura suman entre 3% y 4% extra."
+- Confirmado por Marcos: el presupuesto del proyecto incluye la escritura del terreno.
+- NUNCA decir "sin escritura", "sin escriturar" ni "no hace falta escribano": suena informal o ilegal. El inmueble SÍ se escritura, a nombre del fideicomiso.
 
 A CONFIRMAR con contador: si la compra de tokens paga Impuesto de Sellos en alguna provincia.
 
