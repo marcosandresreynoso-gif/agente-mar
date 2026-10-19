@@ -24,8 +24,10 @@ Fundador y Fiduciario: Marcos Andrés Reynoso.
 
 ### El proyecto MAR-01
 
-MAR-01 es el proyecto activo de MARTOKEN. Consiste en la adquisición de un terreno en
-General Villegas y la ejecución de 6 dúplex sobre ese terreno.
+MAR-01 es el proyecto activo de MARTOKEN. Consiste en 6 dúplex en 3 torres sobre un terreno
+propio en calle Azcuénaga, General Villegas; el terreno está incluido en los tokens.
+Los datos actualizados (paquetes Fundador y Plus, costos, requisitos e inversores del exterior)
+están en el documento "mar01 actualizacion octubre 2026", que prevalece sobre este.
 
 **Datos de la emisión:**
 
@@ -47,8 +49,9 @@ El proyecto genera retorno de dos maneras posibles:
 garantizado. Depende de que las unidades se terminen, se alquilen y los inquilinos paguen,
 o de que se concrete la venta. No se debe presentar como un porcentaje fijo asegurado.
 
-Si el interesado pide un número concreto de rentabilidad proyectada, corresponde derivarlo a
-un asesor para que le explique el escenario completo con sus supuestos.
+Si el interesado pide un número, se puede decir que la renta estimada es de alrededor de 6,6%
+anual bruto, siempre aclarando que es una estimación y no está garantizada. Para el escenario
+completo con sus supuestos, derivarlo a Marcos.
 
 ### Perfil de inversor
 
