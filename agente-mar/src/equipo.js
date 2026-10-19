@@ -446,20 +446,28 @@ async function planificar(pedido, adjTexto = '') {
     `Foco actual del equipo:\n${getFoco()}\n\n` +
     `Equipo disponible:\n${equipo}\n\n` +
     'Respondé SOLO un JSON con esta forma: {"resumen":"qué vas a hacer en 1 frase","tareas":[{"agente":"id","tarea":"instrucción concreta"}]}\n' +
-    'Reglas: entre 1 y 4 tareas, solo los agentes necesarios, en orden lógico (los que dependen de otros van después). ' +
+    'Reglas: entre 1 y 6 tareas, solo los agentes necesarios, en orden lógico (los que dependen de otros van después). ' +
+    'Cada "tarea" es CORTA (máximo 30 palabras): no copies el pedido de Marcos, cada agente ya lo recibe completo. ' +
+    'Si Marcos nombra agentes o áreas, cada uno de los nombrados tiene que tener su propia tarea. ' +
     'Usá exactamente los id de la lista.\n' +
     'Si piden novedades o cambios legales, impositivos, contables o de la CNV: legal (normas y CNV), finanzas (impuestos y contable) y cumplimiento (qué cambia para MARTOKEN), en ese orden.';
-  const raw = await complete(sys, pedido + adjTexto, { json: true, maxTokens: 500, maxEsperaMs: 90000 });
+  const raw = await complete(sys, pedido + adjTexto, { json: true, maxTokens: 900, maxEsperaMs: 90000 });
   let plan;
   try { plan = JSON.parse(raw); } catch (e) { plan = null; }
   let tareas = (plan && Array.isArray(plan.tareas) ? plan.tareas : [])
     .filter((t) => t && AGENTES[t.agente] && t.agente !== 'directora' && t.tarea)
-    .slice(0, 4);
-  if (!tareas.length) tareas = [{ agente: 'analista', tarea: pedido }];
+    .slice(0, 6);
+  // Si Marcos nombró agentes por su nombre y el plan no los incluyó, se agregan con una tarea corta
+  const nombrados = ORDEN.filter((id) => id !== 'directora' && new RegExp(`(^|[^a-záéíóúñ])${AGENTES[id].nombre}(?![a-záéíóúñ])`, 'i').test(pedido));
+  for (const id of nombrados) {
+    if (!tareas.some((t) => t.agente === id)) tareas.push({ agente: id, tarea: `Hacé tu parte del pedido de Marcos desde tu área (${AGENTES[id].area}).` });
+  }
+  tareas = tareas.slice(0, 7);
+  if (!tareas.length) tareas = [{ agente: 'analista', tarea: 'Resolvé el pedido de Marcos.' }];
   // Todo lo que va a publicidad, captación o inversores pasa SIEMPRE por Cumplimiento, al final
   if (/publicidad|anuncio|campa[ñn]a|publicar|post|carrusel|video|inversor|captaci|difusi[oó]n|marketing|exterior|EE\.?\s?UU|Estados Unidos/i.test(pedido)) {
     tareas = tareas.filter((t) => t.agente !== 'cumplimiento');
-    tareas.push({ agente: 'cumplimiento', tarea: 'Revisá TODO lo que hicieron tus compañeros: promesas de rentabilidad, datos inventados, normas (CNV/ARCA), captación fuera de Argentina, urgencia falsa, links y firmas. Indicá qué corregir antes de publicar.' });
+    tareas.push({ agente: 'cumplimiento', tarea: 'Revisá lo que hicieron tus compañeros: promesas de rentabilidad, datos inventados, normas (CNV/ARCA), captación fuera de Argentina, urgencia falsa, links y firmas. NO reescribas su trabajo ni escribas secciones de otras áreas: solo una lista de correcciones, citando la frase exacta, qué está mal y cómo queda. Si no recibiste el trabajo de un área, decilo; no lo inventes.' });
   }
   return { resumen: (plan && plan.resumen) || 'Organizo el pedido con el equipo.', tareas };
 }
