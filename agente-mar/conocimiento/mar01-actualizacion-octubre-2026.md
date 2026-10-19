@@ -46,6 +46,9 @@ contradice a este, vale este**, porque es el más reciente (octubre 2026).
 - Plan de obra: **12 meses**, con curva de inversión mensual.
 - **Prórroga por lluvia:** los días de lluvia se acreditan con el informe climático mensual del
   Servicio Meteorológico Nacional (SMN) para General Villegas; cada día de lluvia suma 1,5 días al plazo de obra.
+- **Plazo para cubrir el terreno: 6 meses.** La obra empieza dentro de 30 días de cubierto el terreno y aprobado el permiso de construcción.
+- **Seguros:** Todo Riesgo Construcción y Responsabilidad Civil durante la obra.
+- **Control:** un profesional independiente certifica cada mes el avance de obra.
 - **Prioridad de los fondos:** primero se paga el terreno (USD 57.000, 570 tokens). Cubierto el
   terreno, la obra arranca y avanza por etapas con lo que siga entrando. Si en el plazo
   definido no se junta lo necesario para el terreno, se devuelve el 100% a cada inversor.
@@ -78,10 +81,12 @@ Hay un **QR de paquetes** que lleva directo al WhatsApp de Marcos con el mensaje
 ## 5. Rentabilidad (siempre como estimación)
 
 - Alquiler de referencia: unos USD 508 por mes por dúplex nuevo de 2 habitaciones en General Villegas.
-- **Renta anual estimada: alrededor de 6,6% bruto** sobre lo invertido.
+- **Renta anual estimada: alrededor de 6,3% bruto** sobre lo invertido (después de la administración del 6%).
+- **La renta se paga MENSUALMENTE, desde que termina la obra** y se alquilan las unidades, en USDT a la wallet de cada inversor.
+- **Administración del complejo:** 6% del alquiler cobrado, mensual, lo cobra Marcos como fiduciario solo cuando hay alquileres. La comisión de cada contrato nuevo la paga el inquilino.
 - Valor de venta de referencia: entre USD 1.250 y USD 1.500 por m² para unidades terminadas.
 - **Nunca presentar la renta como garantizada.** Es una estimación bruta, antes de gastos.
-- El porcentaje de 7,45% que figuraba antes ya no está vigente; usar 6,6%.
+- El 7,45% y el 6,6% que figuraban antes ya no están vigentes; usar 6,3%.
 
 ## 6. Formas de comprar
 
@@ -105,7 +110,7 @@ de MAR-01 se abre directamente la compra con estas 3 opciones.
   vendedor. El precio se acuerda dentro de una banda de USD 85 a USD 115 por token.
 - **Escriturar un dúplex (Fundador o Plus):** gastos de escritura a cargo de quien recibe la unidad.
 
-## 8. Requisitos para invertir (KYC)
+## 8. Requisitos para invertir (KYC, obligatorio)
 
 - Pueden invertir **personas mayores de 18 años y empresas, de Argentina y del exterior.**
 - Datos que se piden: nombre completo, DNI o pasaporte (foto de frente y dorso), CUIT o CUIL

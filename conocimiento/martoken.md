@@ -49,7 +49,7 @@ El proyecto genera retorno de dos maneras posibles:
 garantizado. Depende de que las unidades se terminen, se alquilen y los inquilinos paguen,
 o de que se concrete la venta. No se debe presentar como un porcentaje fijo asegurado.
 
-Si el interesado pide un número, se puede decir que la renta estimada es de alrededor de 6,6%
+Si el interesado pide un número, se puede decir que la renta estimada es de alrededor de 6,3%
 anual bruto, siempre aclarando que es una estimación y no está garantizada. Para el escenario
 completo con sus supuestos, derivarlo a Marcos.
 
