@@ -1,6 +1,6 @@
 # Fideicomiso Madre MARTOKEN y Anexo A (MAR-01) — versión 3, octubre 2026
 
-Texto de referencia del contrato marco (Parte I) y del Anexo A del proyecto MAR-01 (Parte II). Se omitieron datos personales (documentos de identidad y nombres de los herederos). Es un borrador sujeto a revisión legal y a la constitución ante escribano; el plazo de colocación todavía está a definir. Para el público, responder con el contenido del Anexo A; el contrato completo se entrega a inversores en etapa de firma.
+Texto de referencia del contrato marco (Parte I) y del Anexo A del proyecto MAR-01 (Parte II). Se omitieron datos personales (documentos de identidad y nombres de los herederos). Es un borrador sujeto a revisión legal y a la constitución ante escribano; Para el público, responder con el contenido del Anexo A; el contrato completo se entrega a inversores en etapa de firma.
 
 **MARTOKEN**
 
@@ -522,11 +522,19 @@ Si el costo real superara lo previsto o la obra se atrasara por falta de fondos 
 
 A.3.4. Plazo de colocación y devolución
 
-Los fondos recaudados se aplicarán en primer lugar y con prioridad al pago del terreno (USD 57.000, equivalente a 570 tokens), que forma parte del proyecto. Cubierto el terreno, la obra se iniciará y avanzará por etapas con los ingresos posteriores de la colocación. Si dentro del plazo de \[\_\_\_\] meses desde la apertura no se alcanzara el monto necesario para pagar el terreno, el Fiduciario devolverá el 100% de los fondos recibidos a cada inversor; hasta entonces, los fondos permanecerán resguardados en una billetera multifirma del proyecto, sin aplicarse a otro destino.
+Los fondos recaudados se aplicarán en primer lugar y con prioridad al pago del terreno (USD 57.000, equivalente a 570 tokens), que forma parte del proyecto. Cubierto el terreno, la obra se iniciará y avanzará por etapas con los ingresos posteriores de la colocación. Si dentro del plazo de seis (6) meses desde la apertura no se alcanzara el monto necesario para pagar el terreno, el Fiduciario devolverá el 100% de los fondos recibidos a cada inversor; hasta entonces, los fondos permanecerán resguardados en una billetera multifirma del proyecto, sin aplicarse a otro destino. La obra se iniciará dentro de los treinta (30) días de cubierto el pago del terreno y aprobado el permiso de construcción municipal; sin permiso aprobado no se inicia la obra.
 
 A.3.5. Plazo de obra y prórrogas por lluvia
 
 El plazo de obra es de doce (12) meses desde su inicio. Los días de lluvia que impidan trabajar se acreditarán con el informe climático mensual del Servicio Meteorológico Nacional (SMN) para General Villegas, y cada día de lluvia acreditado ampliará el plazo de obra en uno coma cinco (1,5) días, para contemplar el tiempo de secado y reanudación de tareas. El Fiduciario informará a los Beneficiarios cada ampliación de plazo con el informe del SMN correspondiente. Las demoras por otras causas de fuerza mayor (paros, desabastecimiento de materiales, disposiciones de la autoridad) se notificarán a los Beneficiarios dentro de los diez (10) días de producidas, con la reprogramación prevista.
+
+A.3.6. Seguros
+
+Durante la obra el proyecto contará con seguro de Todo Riesgo Construcción y seguro de Responsabilidad Civil. Su costo forma parte del presupuesto de obra. Las pólizas vigentes se informarán a los Beneficiarios.
+
+A.3.7. Certificación de avance de obra
+
+El avance de obra será certificado mensualmente por un profesional independiente (arquitecto, ingeniero o maestro mayor de obras matriculado), quien indicará el porcentaje ejecutado y su correspondencia con la curva de inversión. Los certificados se informarán a los Beneficiarios.
 
 A.4 — BIENES DEL PATRIMONIO FIDUCIARIO MAR-01
 
@@ -578,7 +586,7 @@ Se asignan quinientos (500) tokens MAR-01 a favor de Marcos Andrés Reynoso, en 
 
 - Se registran en una billetera identificada y públicamente verificable en la red Polygon, y se informan a todos los Beneficiarios.
 
-- Forman parte del patrimonio heredable del Fundador conforme a la Cláusula 12.
+- Forman parte del patrimonio heredable del Fundador conforme a la Cláusula 12. Además de estos tokens y del beneficio incluido en el presupuesto de obra, el Desarrollador percibe el honorario de administración del complejo previsto en el punto A.8.4.
 
 - Son libremente transferibles en cualquier momento, sin perjuicio del compromiso de afectación establecido en el punto A.3.3 ante mayores costos o atraso de obra.
 
@@ -612,6 +620,13 @@ A.6.3. Disposiciones comunes
 
 La equivalencia de 818 tokens por unidad surge del costo real por dúplex (obra con incidencias más terreno) y queda fija al momento de la suscripción del paquete. Los tokens se acreditan a medida que se integra cada cuota. En caso de incumplimiento en el pago de cuotas, el inversor conservará únicamente los tokens efectivamente integrados, sin derecho a adjudicación de unidad. Las unidades no adjudicadas se destinarán a alquiler o venta en beneficio de todos los tenedores de tokens vigentes.
 
+A.6.4. Identificación de inversores (KYC)
+
+
+A.6.5. Salida anticipada del inversor
+
+El inversor podrá vender sus tokens en cualquier momento a otros inversores a través del mercado entre inversores de la plataforma, a un precio dentro de la banda vigente (actualmente USD 85 a USD 115 por token), con una comisión del 1,5% a cargo del vendedor. El comprador adquiere automáticamente los derechos del vendedor.
+
 A.7 — ADJUDICACIÓN DE UNIDADES Y PROPIEDAD HORIZONTAL
 
 Finalizada la obra, el Fiduciario procederá a la adjudicación de las unidades correspondientes a los Paquetes Fundador y a los Paquetes Plus que hubieran completado su integración, conforme al siguiente procedimiento:
@@ -636,9 +651,9 @@ A.8.1. Opción 1: Renta por alquiler
 
 - Con las 6 unidades en alquiler: aprox. USD 36.610 anuales.
 
-- Renta anual estimada para el inversor: aprox. 6,6% bruto sobre lo invertido, considerando la totalidad de los tokens vigentes (incluidos los Tokens del Desarrollador).
+- Renta anual estimada para el inversor: aprox. 6,3% bruto sobre lo invertido, luego del honorario de administración del 6% y considerando la totalidad de los tokens vigentes (incluidos los Tokens del Desarrollador).
 
-- La renta se distribuye en proporción a los tokens vigentes y se calcula sobre las unidades no adjudicadas.
+- La renta se distribuye mensualmente, una vez finalizada la obra y alquiladas las unidades, en proporción a los tokens vigentes y sobre las unidades no adjudicadas. El pago se realiza en USDT a la wallet de cada tenedor.
 
 A.8.2. Opción 2: Venta del activo
 
@@ -658,9 +673,13 @@ A.8.3. Gastos deducibles del ingreso bruto
 
 - Seguros del inmueble
 
-- Gastos de administración del fideicomiso y plataformas tecnológicas
+- Honorario de administración del complejo (punto A.8.4)
 
 El Fiduciario informará trimestralmente a los tenedores de tokens el detalle de ingresos brutos, gastos deducidos y resultados netos distribuidos. Dicho informe será público y accesible a todos los beneficiarios.
+
+A.8.4. Honorario de administración del complejo
+
+Desde que las unidades comiencen a alquilarse, el Fiduciario percibirá un honorario de administración del seis por ciento (6%) del alquiler efectivamente cobrado, en forma mensual, que se descuenta antes de distribuir la renta. Cubre la cobranza, los contratos de alquiler, la coordinación del mantenimiento, la distribución de la renta, los informes a los Beneficiarios y la plataforma tecnológica. Durante la obra no se cobra honorario de administración. La comisión por la firma de cada nuevo contrato de alquiler está a cargo del inquilino.
 
 A.9 — PARTICIPACIÓN PROFESIONAL
 
