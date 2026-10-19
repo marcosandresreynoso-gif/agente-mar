@@ -334,6 +334,16 @@ const REGLA_NOVEDADES =
   'TOKENIZACIÓN CNV: el Capítulo I, Sección II del Título XII de las NORMAS de la CNV es el régimen de TOKENIZACIÓN (representación digital de valores negociables y sandbox). ' +
   'Cualquier resolución o consulta pública sobre eso es RELEVANTE para MARTOKEN, aunque sea una consulta: decí de qué trata, la fecha límite para opinar y recomendá leerla. Nunca la marques "sin impacto".\n' +
   'No afirmes que "no hubo cambios" en un tema (UIF, ARCA, etc.) si la investigación web no lo buscó: decí "no lo revisé".\n';
+// Resumen del Anexo A de MAR-01: se agrega completo cuando el pedido es sobre el fideicomiso o el contrato
+let RESUMEN_ANEXO = null;
+function resumenAnexo() {
+  if (RESUMEN_ANEXO === null) {
+    try { RESUMEN_ANEXO = require('fs').readFileSync(require('path').join(__dirname, '..', 'conocimiento', 'anexo-a-mar01-resumen.md'), 'utf8'); }
+    catch (e) { RESUMEN_ANEXO = ''; }
+  }
+  return RESUMEN_ANEXO;
+}
+const ES_FIDEICOMISO = /fideicomis|anexo|contrato|escriban|cl[aá]usula|fiduciari|propiedad horizontal|\bph\b|mar-?01/i;
 const ES_IMPOSITIVO = /impuest|imposit|fiscal|tribut|arca|afip|ganancia|bienes personales|sellos|escritur|inocencia|exenci|declara/i;
 
 function promptAgente(id, consulta, investigacion = '') {
@@ -349,6 +359,7 @@ function promptAgente(id, consulta, investigacion = '') {
   if (datos) s += `\nDATOS ACTUALES DEL SISTEMA:\n${datos}\n`;
   if (investigacion) s += `\nINVESTIGACIÓN WEB (hecha hoy, con fuentes):\n"""\n${investigacion.slice(0, 6000)}\n"""\n`;
   if (ES_IMPOSITIVO.test(consulta) && guiaImpuestos()) s += `\nGUÍA IMPOSITIVA VERIFICADA (única fuente válida para impuestos):\n"""\n${guiaImpuestos()}\n"""\n`;
+  if (ES_FIDEICOMISO.test(consulta) && resumenAnexo()) s += `\nANEXO A DE MAR-01 (texto vigente, versión 3; YA LO TENÉS, no lo pidas; basate en esto y no inventes cláusulas):\n"""\n${resumenAnexo()}\n"""\n`;
   if (ES_NOVEDADES.test(consulta)) s += REGLA_NOVEDADES;
   if (contexto && contexto.trim()) s += `\nDOCUMENTACIÓN DE MARTOKEN (fuente principal):\n"""\n${contexto}\n"""\n`;
   return s;
