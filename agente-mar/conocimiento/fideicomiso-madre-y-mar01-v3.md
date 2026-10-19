@@ -524,6 +524,10 @@ A.3.4. Plazo de colocación y devolución
 
 Los fondos recaudados se aplicarán en primer lugar y con prioridad al pago del terreno (USD 57.000, equivalente a 570 tokens), que forma parte del proyecto. Cubierto el terreno, la obra se iniciará y avanzará por etapas con los ingresos posteriores de la colocación. Si dentro del plazo de \[\_\_\_\] meses desde la apertura no se alcanzara el monto necesario para pagar el terreno, el Fiduciario devolverá el 100% de los fondos recibidos a cada inversor; hasta entonces, los fondos permanecerán resguardados en una billetera multifirma del proyecto, sin aplicarse a otro destino.
 
+A.3.5. Plazo de obra y prórrogas por lluvia
+
+El plazo de obra es de doce (12) meses desde su inicio. Los días de lluvia que impidan trabajar se acreditarán con el informe climático mensual del Servicio Meteorológico Nacional (SMN) para General Villegas, y cada día de lluvia acreditado ampliará el plazo de obra en uno coma cinco (1,5) días, para contemplar el tiempo de secado y reanudación de tareas. El Fiduciario informará a los Beneficiarios cada ampliación de plazo con el informe del SMN correspondiente. Las demoras por otras causas de fuerza mayor (paros, desabastecimiento de materiales, disposiciones de la autoridad) se notificarán a los Beneficiarios dentro de los diez (10) días de producidas, con la reprogramación prevista.
+
 A.4 — BIENES DEL PATRIMONIO FIDUCIARIO MAR-01
 
 Conforme a la Cláusula 7 del Fideicomiso Madre, todos los bienes del proyecto MAR-01 integran el patrimonio fiduciario y son administrados por el Fiduciario en beneficio exclusivo de los tenedores de tokens MAR-01.

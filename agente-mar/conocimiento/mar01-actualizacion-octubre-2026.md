@@ -44,6 +44,8 @@ contradice a este, vale este**, porque es el más reciente (octubre 2026).
 - **Costo total del proyecto: unos USD 490.500.**
 - **Un dúplex (obra + terreno) equivale a unos USD 81.750, es decir 818 tokens.**
 - Plan de obra: **12 meses**, con curva de inversión mensual.
+- **Prórroga por lluvia:** los días de lluvia se acreditan con el informe climático mensual del
+  Servicio Meteorológico Nacional (SMN) para General Villegas; cada día de lluvia suma 1,5 días al plazo de obra.
 - **Prioridad de los fondos:** primero se paga el terreno (USD 57.000, 570 tokens). Cubierto el
   terreno, la obra arranca y avanza por etapas con lo que siga entrando. Si en el plazo
   definido no se junta lo necesario para el terreno, se devuelve el 100% a cada inversor.
@@ -144,3 +146,16 @@ de MAR-01 se abre directamente la compra con estas 3 opciones.
   responsabilidad son de Marcos. Si alguien pregunta, decirlo con transparencia.
 - Para vivienda propia, contar que existe el **padrón de preinscripción gratuito de MAR-50**
   en https://www.martoken.com.ar.
+
+## 12. Aclaraciones para el área legal
+
+- **MAR-01 no tiene sorteo.** El sorteo verificable con Chainlink VRF es del proyecto **MAR-50**
+  (viviendas). No mezclar MAR-50 con MAR-01.
+- **MAR-01 no tiene preinscriptos**: tiene venta activa de tokens y paquetes. El padrón de
+  preinscripción es de MAR-50 (y el formulario de interesados del exterior de MAR-01).
+- El titular del terreno y de la obra es el **fideicomiso** (Anexo A), no una sociedad.
+- La **propiedad horizontal** se rige por el **Código Civil y Comercial de la Nación**
+  (artículos 2037 y siguientes). La Ley 13.512 está derogada desde 2015; no citarla.
+- El Anexo A ya tiene: fondo de reserva, Tokens de Reserva, orden para cubrir mayores costos,
+  devolución si no se paga el terreno, prórroga por lluvia, adjudicación y escrituración de unidades.
+- Antes de afirmar que una cláusula "dice" algo, revisar el texto del Anexo A; no inventar cláusulas.
