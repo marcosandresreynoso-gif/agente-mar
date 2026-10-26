@@ -53,6 +53,7 @@ const AGENTES = {
     herramientas: ['Equipo completo', 'Historial de misiones'],
     autonomia: 'Escribile tu pedido por chat: arma la misión, la reparte al equipo y te deja el informe ahí mismo. No ejecuta acciones externas.',
     rag: 'todos',
+    datos: 'resumen',
     prompt:
       'Sos la Directora de Operaciones de MARTOKEN. Coordinás al equipo, priorizás con el criterio ' +
       '"Demanda primero. Terreno después." y presentás conclusiones claras y accionables para Marcos.'
@@ -169,6 +170,7 @@ const AGENTES = {
     herramientas: ['Base de conocimiento', 'Historial de misiones'],
     autonomia: 'Solo analiza y recomienda.',
     rag: 'todos',
+    datos: 'resumen',
     prompt:
       'Sos el Analista de Proyectos de MARTOKEN. Evaluás oportunidades nuevas de tokenización (inmuebles, campo, ' +
       'deudas, acciones de empresas) con el criterio "Demanda primero. Terreno después.": primero validar quién compra y por qué, después ejecutar.'
@@ -269,6 +271,11 @@ function datosDelSistema(tipo) {
         '\nÚltimos leads (sin datos de contacto):\n' +
         (ultimos.map((l) => `- ${l.empresa || l.nombre || 's/n'} · ${l.interes || ''} · ${l.fuente || ''}${l.notas ? ' · ' + l.notas : ''}`).join('\n') || '- ninguno');
     }
+    if (tipo === 'resumen') {
+      // Lo único que la oficina sabe de verdad sobre personas: contactos de WhatsApp y leads cargados acá
+      return datosDelSistema('whatsapp') + '\n' + datosDelSistema('leads') +
+        '\nNO DISPONIBLE para la oficina: preinscriptos de MAR-50 (llegan al mail de Marcos), compradores de MAR-01 (blockchain), KYC (no hay proveedor). Si te preguntan por eso: "NO TENGO ESE DATO".';
+    }
     if (tipo === 'fuentes') {
       const porFuente = db.prepare('SELECT fuente, COUNT(*) n FROM wa_contactos GROUP BY fuente').all();
       const anuncios = db.prepare(`SELECT anuncio, COUNT(*) n FROM wa_contactos WHERE anuncio IS NOT NULL GROUP BY anuncio ORDER BY n DESC LIMIT 8`).all();
@@ -306,6 +313,14 @@ const REGLAS_COMUNES =
   '- La GUÍA IMPOSITIVA VERIFICADA manda sobre la investigación web. Si la web menciona otras ventajas impositivas, exenciones o leyes que no están en la guía, NO las presentes como ventajas: listalas aparte como "A verificar con contador". Lo que la guía marca A CONFIRMAR tampoco se presenta como hecho.\n' +
   '- IMPUESTOS: cuando el tema sea impositivo, usá SOLO la "GUÍA IMPOSITIVA VERIFICADA". Explicá con claridad las ventajas que ahí figuran; no agregues otras ni afirmes lo que la guía marca como falso o A CONFIRMAR. Cerrá con: "Información general. Consultá tu caso con tu contador."\n' +
   '- No inventes datos: si algo no está en la documentación ni en los datos, decilo y sugerí cómo conseguirlo.\n' +
+  '- REALIDAD DE MARTOKEN (no la contradigas): el ÚNICO humano es Marcos. NO existen empleados, "responsable de KYC", "KYC Lead", "equipo de TI", gerentes ni proveedores contratados. ' +
+  'NO hay plataforma de KYC (ni Onfido, ni Jumio, ni otra), NO hay "dashboard de KYC", NO hay "correo institucional", NO hay carpetas ni hojas de Google Drive del equipo. ' +
+  'La preinscripción de MAR-50 llega por formulario al mail de Marcos; las compras de MAR-01 quedan en la blockchain (Polygon). La oficina NO tiene acceso a ninguna de las dos.\n' +
+  '- PROHIBIDO INVENTAR personas, nombres propios ("Juan Pérez"), cargos, herramientas, proveedores, carpetas, archivos, procesos internos o cantidades de personas (interesados, preinscriptos, inversores, KYC). ' +
+  'Una cifra de personas SOLO se da si está en DATOS ACTUALES DEL SISTEMA o en un adjunto de Marcos, diciendo de cuál salió. Si no, escribí: "NO TENGO ESE DATO".\n' +
+  '- Si Marcos pregunta si un dato es real o cómo verificarlo: decí de dónde salió (DATOS ACTUALES DEL SISTEMA, adjunto, documentación o investigación web con URL). ' +
+  'Si no sale de ninguna de esas fuentes, reconocelo sin vueltas: "Ese dato no tiene fuente: fue inventado, no lo uses". Nunca defiendas un dato que no podés respaldar.\n' +
+  '- TU RESPUESTA ES UN INFORME INTERNO PARA MARCOS: no lo encabeces con firma, no empieces con "Estimado", no lo firmes ni pongas datos de contacto al final. La firma "Marcos Reynoso – MARTOKEN" va SOLO dentro de borradores de mensajes para terceros.\n' +
   '- NUNCA ejecutás acciones externas (enviar mensajes, publicar, pagar, firmar, lanzar campañas). ' +
   'Si hace falta una, la proponés al final para que Marcos la apruebe.\n' +
   '- Si proponés acciones, terminá tu respuesta con una sección exacta así:\n' +
@@ -547,7 +562,9 @@ async function ejecutarMision(misionId) {
         '\nAhora escribí el INFORME FINAL para Marcos: conclusión en 2-3 líneas, lo más importante de cada área, ' +
         'y próximos pasos numerados. Máximo 300 palabras. No repitas todo: sintetizá. No incluyas sección de acciones propuestas.\n' +
         'PROHIBIDO inventar resultados, métricas o situaciones (CPL, leads, inscriptos, ventas, "la campaña está generando…"): ' +
-        'usá SOLO lo que dijo Marcos en su pedido y lo que hizo el equipo. Si faltan datos, decilo y pedilos.' +
+        'usá SOLO lo que dijo Marcos en su pedido, lo que hizo el equipo y DATOS ACTUALES DEL SISTEMA. Si faltan datos, decilo y pedilos. ' +
+        'Si un compañero nombró personas, cargos, herramientas, proveedores o carpetas que MARTOKEN no tiene, NO los pases al informe: avisá que eran inventados. ' +
+        'No encabeces ni firmes el informe.' +
         (fallidas.length ? `\nIMPORTANTE: ${fallidas.join(', ')} no pudo/pudieron completar su tarea. Decilo claramente en el informe.` : '');
       const user = `Pedido: ${m.pedido}${bloqueAdjuntos(adj, 2500, recortar)}\n\nTrabajo del equipo:\n` + hechos.map((h) => `### ${h.nombre} (${h.puesto})\n${recortar(h.texto, Math.floor(9000 / hechos.length))}`).join('\n\n');
       try {
@@ -556,7 +573,18 @@ async function ejecutarMision(misionId) {
         informe = '⚠️ Victoria no pudo escribir el informe final (' + e.message.slice(0, 150) + '). Abajo tenés el trabajo de cada agente completo.' + avisoFallas;
       }
     } else if (hechos.length === 1) {
-      informe = hechos[0].texto + avisoFallas;
+      // Aunque trabaje un solo agente, Victoria revisa que no haya datos inventados (antes solo copiaba el texto)
+      try {
+        const sys = promptAgente('directora', m.pedido, recortar(investigacion, 2500)) +
+          '\nRevisá el trabajo de tu compañero ANTES de que llegue a Marcos. Devolvé el texto corregido completo, sin encabezado ni firma.\n' +
+          'Borrá o marcá "(NO TENGO ESE DATO)" todo lo que no tenga respaldo en DATOS ACTUALES DEL SISTEMA, adjuntos, documentación o investigación web: ' +
+          'personas o cargos inventados, herramientas o proveedores que MARTOKEN no tiene, carpetas o archivos, cifras de interesados, preinscriptos, inversores o KYC.\n' +
+          'Si el pedido de Marcos es si un dato es falso y ese dato no tiene fuente, empezá con: "Sí: ese dato no tiene fuente, fue inventado. No lo uses."';
+        const user = `Pedido: ${m.pedido}${bloqueAdjuntos(adj, 2500, recortar)}\n\nTrabajo de ${hechos[0].nombre} (${hechos[0].puesto}):\n${recortar(hechos[0].texto, 9000)}`;
+        informe = controlarYAnotar(separarAcciones(await complete(sys, user, { maxTokens: 1100, temperature: 0.2, maxEsperaMs: 90000 })).texto) + avisoFallas;
+      } catch (e) {
+        informe = hechos[0].texto + '\n\n⚠️ Victoria no pudo revisar este trabajo: verificá cada dato antes de usarlo.' + avisoFallas;
+      }
     } else {
       const det = db.prepare(`SELECT resultado FROM eq_tareas WHERE mision_id = ? AND estado = 'error' ORDER BY orden DESC LIMIT 1`).get(misionId);
       const motivo = ((det && det.resultado) || '').split('Detalle técnico: ')[1] || '';
