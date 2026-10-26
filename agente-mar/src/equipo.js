@@ -303,6 +303,7 @@ const REGLAS_COMUNES =
   '- CNV: MARTOKEN HOY NO hace oferta pública, NO está en el sandbox de tokenización de la CNV y sus tokens NO son valores negociables autorizados. Nunca digas que MARTOKEN "cumple", "está autorizado" o que la CNV "permite su estructura actual". No inventes estados contables, alquileres ni ingresos que Marcos no informó.\n' +
   '- CONTACTO OFICIAL: martokenoficial@gmail.com y el WhatsApp de MARTOKEN. No inventes otros emails.\n' +
   '- LINKS CON SEGUIMIENTO (UTM): los parámetros van ANTES del #. Ejemplo correcto: https://www.martoken.com.ar/?utm_source=facebook&utm_campaign=mar50#mar50\n' +
+  '- SORTEO MAR-50: la única regla es que los primeros anotados tienen prioridad. NO inventes puntajes, "más chances" por referidos ni otras reglas del sorteo.\n' +
   '- Sin urgencia falsa: nada de contadores, "últimos cupos" ni "cupos limitados" si no es real.\n' +
   '- Idioma: las piezas van en español rioplatense. Si el público no habla español, avisá que hace falta traducción en vez de mandar el texto en español.\n' +
   '- NO uses tablas: Marcos lee desde el celular. Presentá todo en listas o párrafos cortos, uno debajo del otro.\n' +
@@ -382,7 +383,7 @@ function promptAgente(id, consulta, investigacion = '') {
 
 // Separa el texto del agente de su lista de acciones propuestas
 function separarAcciones(texto) {
-  const m = String(texto || '').split(/\n\s*\**ACCIONES PROPUESTAS:?\**\s*\n/i);
+  const m = String(texto || '').split(/\n\s*#*\s*\**ACCIONES PROPUESTAS:?\**:?\s*\n/i);
   if (m.length < 2) return { texto: String(texto || '').trim(), acciones: [] };
   const acciones = m[1].split('\n').map((l) => l.replace(/^\s*[-*•\d.)]+\s*/, '').trim()).filter((l) => l.length > 3).slice(0, 6);
   return { texto: m[0].trim(), acciones };
@@ -468,9 +469,22 @@ async function planificar(pedido, adjTexto = '') {
     'Si piden novedades o cambios legales, impositivos, contables o de la CNV: legal (normas y CNV), finanzas (impuestos y contable) y cumplimiento (qué cambia para MARTOKEN), en ese orden.';
   const raw = await complete(sys, pedido + adjTexto, { json: true, maxTokens: 900, maxEsperaMs: 90000 });
   let plan;
-  try { plan = JSON.parse(raw); } catch (e) { plan = null; }
-  let tareas = (plan && Array.isArray(plan.tareas) ? plan.tareas : [])
-    .filter((t) => t && AGENTES[t.agente] && t.agente !== 'directora' && t.tarea)
+  try { plan = JSON.parse(raw); } catch (e) {
+    // A veces el modelo agrega texto alrededor del JSON: se rescata lo que está entre llaves
+    try { const j = String(raw || '').match(/\{[\s\S]*\}/); plan = j ? JSON.parse(j[0]) : null; } catch (e2) { plan = null; }
+  }
+  // El modelo a veces pone el nombre ("Lucía") o el puesto en vez del id: se traduce al id correcto
+  const sinTilde = (x) => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const aId = (x) => {
+    const v = sinTilde(x);
+    if (AGENTES[v]) return v;
+    return Object.keys(AGENTES).find((id) => v && (v.includes(sinTilde(AGENTES[id].nombre)) || v.includes(sinTilde(AGENTES[id].puesto).split(' ')[0]))) || null;
+  };
+  const crudas = plan && (Array.isArray(plan.tareas) ? plan.tareas : Array.isArray(plan.tasks) ? plan.tasks : []);
+  if (!crudas || !crudas.length) console.error('[equipo] el plan no trajo tareas válidas:', String(raw || '').slice(0, 300));
+  let tareas = (crudas || [])
+    .map((t) => t && ({ agente: aId(t.agente || t.id || t.nombre), tarea: t.tarea || t.instruccion || t.task }))
+    .filter((t) => t && t.agente && t.agente !== 'directora' && t.tarea)
     .slice(0, 6);
   // Si Marcos nombró agentes por su nombre y el plan no los incluyó, se agregan con una tarea corta
   const nombrados = ORDEN.filter((id) => id !== 'directora' && new RegExp(`(^|[^a-záéíóúñ])${AGENTES[id].nombre}(?![a-záéíóúñ])`, 'i').test(pedido));
@@ -577,8 +591,9 @@ async function ejecutarMision(misionId) {
       try {
         const sys = promptAgente('directora', m.pedido, recortar(investigacion, 2500)) +
           '\nRevisá el trabajo de tu compañero ANTES de que llegue a Marcos. Devolvé el texto corregido completo, sin encabezado ni firma.\n' +
-          'Borrá o marcá "(NO TENGO ESE DATO)" todo lo que no tenga respaldo en DATOS ACTUALES DEL SISTEMA, adjuntos, documentación o investigación web: ' +
+          'Las PROPUESTAS e ideas (qué hacer, canales, campañas) se dejan como están: no las marques. "(NO TENGO ESE DATO)" va SOLO junto a AFIRMACIONES sobre la realidad sin respaldo en DATOS ACTUALES DEL SISTEMA, adjuntos, documentación o investigación web: ' +
           'personas o cargos inventados, herramientas o proveedores que MARTOKEN no tiene, carpetas o archivos, cifras de interesados, preinscriptos, inversores o KYC.\n' +
+          'Mantené SIEMPRE la parte con datos reales del sistema (contactos, leads) y no recortes opciones del compañero salvo que estén mal.\n' +
           'Si el pedido de Marcos es si un dato es falso y ese dato no tiene fuente, empezá con: "Sí: ese dato no tiene fuente, fue inventado. No lo uses."';
         const user = `Pedido: ${m.pedido}${bloqueAdjuntos(adj, 2500, recortar)}\n\nTrabajo de ${hechos[0].nombre} (${hechos[0].puesto}):\n${recortar(hechos[0].texto, 9000)}`;
         informe = controlarYAnotar(separarAcciones(await complete(sys, user, { maxTokens: 1100, temperature: 0.2, maxEsperaMs: 90000 })).texto) + avisoFallas;
