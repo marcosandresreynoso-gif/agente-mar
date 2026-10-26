@@ -22,7 +22,8 @@ const CORRECCIONES = [
   // Nombres de agentes hacia afuera → firma de Marcos
   [/\bsoy\s+(?:Luc[ií]a|Tom[aá]s|Sof[ií]a|Bruno|Martina|Diego|Ramiro|Elena|Victoria)(?=[\s,.]|$)/gi, (m) => (m[0] === 'S' ? 'Soy Marcos' : 'soy Marcos'), 'se cambió el nombre de agente por "Marcos" en la presentación'],
   [/^([\s>]*)[*_]*(?:Luc[ií]a|Tom[aá]s|Sof[ií]a|Bruno|Martina|Diego|Ramiro|Elena|Victoria)[*_]*\s*[–—-]\s*[^\n]*?(Captaci|Prospecci|Atenci|Marketing|Contenido|Legal|Finanzas|Analista|Cumplimiento|Directora|Operaciones)[^\n]*$/gim,
-    (m, pre) => `${pre}**Marcos Reynoso – MARTOKEN**`, 'se reemplazó la firma de agente por "Marcos Reynoso – MARTOKEN"'],
+    // Si es el encabezado del informe (primera línea), se borra: un informe interno no lleva la firma de Marcos
+    (m, pre, g2, off, str) => (str.slice(0, off).trim() === '' ? '' : `${pre}**Marcos Reynoso – MARTOKEN**`), 'firma de agente corregida (sacada del encabezado o cambiada por la de Marcos)'],
   // Frases que suenan informales o ilegales
   [/\bsin\s+escritura(?:r)?\b/gi, () => 'con gastos de escritura incluidos', 'se cambió "sin escritura" por "gastos de escritura incluidos"'],
 ];
@@ -42,6 +43,10 @@ const ALERTAS = [
   [/retenci[oó]n\s+del?\s+31\s*%/gi, 'Menciona una retención del 31% que no existe.'],
   [/\b(8[,.]31|7[,.]6)\s*%/g, 'Publica un porcentaje de renta de MAR-50 (no se publica durante la preinscripción).'],
   [/\bLey(?:es)?\s+(27\.551|27\.442)\b/gi, 'Cita una ley que no tiene relación con tokens.'],
+  // Cosas que MARTOKEN no tiene: si aparecen, casi seguro son inventadas
+  [/\b(Juan|Mar[ií]a|Pedro|Carlos|Ana)\s+P[eé]rez\b|\bKYC\s+Lead\b|responsable\s+de\s+(KYC|TI|sistemas|cumplimiento)\b|equipo\s+de\s+(TI|sistemas|KYC)\b|\b(responsables?|[aá]rea)\s+de\s+TI\b/gi, 'Nombra personas o áreas que MARTOKEN no tiene (el único humano es Marcos): dato INVENTADO.'],
+  [/\b(Onfido|Jumio|Sumsub|Veriff)\b|dashboard\s+de\s+KYC|plataforma\s+(de\s+gesti[oó]n\s+)?KYC|correo\s+institucional/gi, 'Nombra herramientas o cuentas que MARTOKEN no tiene: dato INVENTADO.'],
+  [/\b\d+\s+(?:de\s+(?:los|las)\s+\d+\s+)?(preinscript\w*|inscript\w*|interesad\w*|inversor\w*|en\s+proceso\s+de\s+KYC)/gi, 'Da una cantidad de personas: confirmá que salga de tus datos reales (la oficina NO ve las preinscripciones ni las compras).'],
   [/https?:\/\/(?!(?:www\.)?martoken\.com\.ar)[^\s)]+/gi, null],   // links externos: se listan para revisar (no es error)
 ];
 
